@@ -9,21 +9,21 @@
       <div class="vector" title="显示矢量标注地图" @click="invisibelVector">
         <img
           src="./assets/zhushi.png"
-          style="height: 53px; width: 53px"
+          style="width: 53px; height: 53px"
           alt=""
         />
       </div>
       <div class="image" title="显示卫星地图" @click="invisibelImage">
         <img
           src="./assets/weixin.png"
-          style="height: 53px; width: 53px"
+          style="width: 53px; height: 53px"
           alt=""
         />
       </div>
       <div class="gaodeVector" title="显示高德地图" @click="invisibelGaode">
         <img
           src="./assets/gaode.png"
-          style="height: 53px; width: 53px"
+          style="width: 53px; height: 53px"
           alt=""
         />
       </div>
@@ -189,10 +189,11 @@ window.onresize = () => {
   width: 1920px;
   height: 1080px;
   transform-origin: left top;
+
   // width: 100vw;
   // height: 100vh;
   // position: relative;
-  //zoom控件
+  // zoom控件
   ::v-deep .zoom {
     display: flex;
     flex-direction: column;
@@ -201,54 +202,62 @@ window.onresize = () => {
     margin-top: 3px;
     margin-left: 3px;
   }
-  //缩放控件
+
+  // 缩放控件
   ::v-deep .extent {
     margin-top: 40px;
     margin-left: 3px;
   }
+
   .title {
+    position: absolute;
+    top: 2%;
+    left: 3%;
+    z-index: 100;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    position: absolute;
-    background-color: rgba(255, 255, 255, 0.8);
-    top: 2%;
-    left: 3%;
     width: 20%;
-    z-index: 100;
+    background-color: rgb(255 255 255 / 80%);
+
     .zh {
       font-size: 25px;
     }
+
     .zhuangzu {
       font-style: italic;
     }
   }
+
   .basemap {
     margin-left: 10px;
+
     .vector {
-      width: 53px;
-      height: 53px;
       position: absolute;
       top: 80%;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 1);
       z-index: 4;
-    }
-    .image {
       width: 53px;
       height: 53px;
+      box-shadow: 0 0 10px rgb(0 0 0 / 100%);
+    }
+
+    .image {
       position: absolute;
       top: 90%;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 1);
       z-index: 4;
-    }
-    .gaodeVector {
       width: 53px;
       height: 53px;
+      box-shadow: 0 0 10px rgb(0 0 0 / 100%);
+    }
+
+    .gaodeVector {
       position: absolute;
       top: 70%;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 1);
       z-index: 4;
+      width: 53px;
+      height: 53px;
+      box-shadow: 0 0 10px rgb(0 0 0 / 100%);
     }
   }
 }

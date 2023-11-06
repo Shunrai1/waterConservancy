@@ -4,7 +4,8 @@
       <span class="zh">水利信息在线分析服务系统</span>
       <span class="zhuangzu">Shui Li Vahc Yitxinz Vahc Vunz Nghienz</span>
     </div>
-    <div class="opration"></div>
+    <!-- 右侧操作选择面板 -->
+    <Opration />
     <div class="basemap">
       <div class="vector" title="显示矢量标注地图" @click="invisibelVector">
         <img
@@ -34,6 +35,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import Opration from './components/Opration.vue'
 //openlayers的API
 import { Map, View } from 'ol'
 import TileLayer from 'ol/layer/Tile'
@@ -44,19 +46,18 @@ import GeoJSON from 'ol/format/GeoJSON'
 import VectorLayer from 'ol/layer/Vector'
 import Style from 'ol/style/Style'
 import Stroke from 'ol/style/Stroke'
-
 import { fromLonLat } from 'ol/proj'
 
-let centerCoordinate = ref([109.079829, 23.770015])
-let zoom = ref(7.5)
-let view = ref<View>()
-let image = ref<TileLayer<any>>()
-let vector = ref<TileLayer<any>>()
-let vectorSign = ref<TileLayer<any>>()
-let gaode = ref<TileLayer<any>>()
-let map = ref<Map>()
-let mapRef = ref()
-let guanxiVector = ref<VectorLayer<any>>()
+const centerCoordinate = ref([109.079829, 23.770015])
+const zoom = ref(7.5)
+const view = ref<View>()
+const image = ref<TileLayer<any>>()
+const vector = ref<TileLayer<any>>()
+const vectorSign = ref<TileLayer<any>>()
+const gaode = ref<TileLayer<any>>()
+const map = ref<Map>()
+const mapRef = ref()
+const guanxiVector = ref<VectorLayer<any>>()
 
 // 方法
 //定义大屏缩放比例
@@ -162,7 +163,7 @@ const initMap = () => {
   })
 
   //获取当前地图范围
-  let extent = view.value.calculateExtent(map.value.getSize())
+  const extent = view.value.calculateExtent(map.value.getSize())
   map.value.addControl(
     new ZoomToExtent({
       extent: extent,
@@ -194,7 +195,7 @@ window.onresize = () => {
   // height: 100vh;
   // position: relative;
   // zoom控件
-  ::v-deep .zoom {
+  :deep(.zoom) {
     display: flex;
     flex-direction: column;
     width: 27px;
@@ -204,7 +205,7 @@ window.onresize = () => {
   }
 
   // 缩放控件
-  ::v-deep .extent {
+  :deep(.extent) {
     margin-top: 40px;
     margin-left: 3px;
   }

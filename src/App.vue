@@ -5,7 +5,7 @@
       <span class="zhuangzu">Shui Li Vahc Yitxinz Vahc Vunz Nghienz</span>
     </div>
     <!-- 右侧操作选择面板 -->
-    <Opration />
+    <Opration :map="map" />
     <div class="basemap">
       <div class="vector" title="显示矢量标注地图" @click="invisibelVector">
         <img
@@ -49,7 +49,7 @@ import Stroke from 'ol/style/Stroke'
 import { fromLonLat } from 'ol/proj'
 
 const centerCoordinate = ref([109.079829, 23.770015])
-const zoom = ref(7.5)
+const zoom = ref(8)
 const view = ref<View>()
 const image = ref<TileLayer<any>>()
 const vector = ref<TileLayer<any>>()

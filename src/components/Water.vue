@@ -41,15 +41,93 @@ import { onMounted, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { getReservoirDataAPI, searchAPI } from '@/api/Water/index'
 import { SitInfo } from '@/api/Water/type'
+import { Feature } from 'ol'
+import { Point } from 'ol/geom'
+import { Cluster } from 'ol/source'
+import { Vector as VectorLayer } from 'ol/layer'
+import { Vector } from 'ol/source'
+import { Style, Stroke, Fill, Text, RegularShape } from 'ol/style'
+import useWaterStore from '@/store/modules/water'
+import { fromLonLat } from 'ol/proj'
 
+const waterStore = useWaterStore()
 const radio = ref(3)
 const waterSearch = ref('')
 const pageSize = ref(7)
 const currentPage = ref(1)
 const total = ref(10)
-//书库数据
+//水库数据
 const tableData = ref<SitInfo[]>([])
+const props = defineProps(['dataRes'])
 
+//初始化水库图层
+const initReservoirLayer = () => {
+  //此示例创建多个要素]
+
+  const count = props.dataRes.length
+  const features = new Array(count)
+
+  for (let i = 0; i < count; ++i) {
+    const coordinates = fromLonLat([
+      parseFloat(props.dataRes[i].lon),
+      parseFloat(props.dataRes[i].lat),
+    ])
+    features[i] = new Feature(new Point(coordinates))
+  }
+
+  //矢量要素数据源
+  const source = new Vector({
+    features: features,
+  })
+
+  //聚合标注数据源
+  const clusterSource = new Cluster({
+    // 指定了聚合的距离阈值，即距离小于等于 50 像素的要素将被组合成一个聚合点
+    distance: 50,
+    source: source,
+  })
+
+  //加载聚合标注的矢量图层
+  const styleCache: any = {}
+  const clusters = new VectorLayer({
+    source: clusterSource,
+    style: function (feature) {
+      //获取每个聚合标注要素的features属性，含有多少个feature
+      const size = feature.get('features').length
+      let style = styleCache[size]
+      if (!style) {
+        style = [
+          new Style({
+            image: new RegularShape({
+              fill: new Fill({
+                color: '#3399CC',
+              }),
+              stroke: new Stroke({
+                color: '#fff',
+              }),
+              points: 3, // 三角形的边数
+              radius: 10, // 三角形的半径
+              angle: 0, // 三角形的旋转角度
+            }),
+            text: new Text({
+              text: size.toString(),
+              fill: new Fill({
+                color: '#fff',
+              }),
+              font: '12px Arial', // 设置文本的字体大小和字体类型
+            }),
+          }),
+        ]
+        styleCache[size] = style
+      }
+      return style
+    },
+  })
+
+  //存储图层
+  waterStore.setReservoir(clusters)
+}
+initReservoirLayer()
 //当前页数改变
 const currentChange = (val: any) => {
   if (radio.value == 3) {

@@ -1,6 +1,6 @@
 <template>
   <div class="opration">
-    <el-checkbox-group v-model="checkList">
+    <el-checkbox-group v-model="checkList" @change="checkChange">
       <el-checkbox label="实时水情" />
       <el-checkbox label="实时雨情" />
       <el-checkbox label="台风路径" />
@@ -29,7 +29,7 @@
           :name="item.name"
         >
           <template v-slot>
-            <Water />
+            <Water :dataRes="dataRes" />
           </template>
         </el-tab-pane>
       </el-tabs>
@@ -38,14 +38,36 @@
 </template>
 
 <script setup lang="ts">
+import useWaterStore from '@/store/modules/water'
 import { List } from '@element-plus/icons-vue'
 import { ref, watch } from 'vue'
-import { TabPaneName } from 'element-plus'
+import { CheckboxValueType, TabPaneName } from 'element-plus'
 import Water from './Water.vue'
+import { SitInfo } from '@/api/Water/type'
+import { getAllAPI } from '@/api/Water'
+
+const props = defineProps(['map'])
+const waterStore = useWaterStore()
 const editList = ref<any>([]) //card的值
 const checkList = ref<any>([]) //多选框的值
 const flag = ref(false) //card展示
 const resetBtn = ref()
+
+let dataRes: SitInfo[] = []
+getAllAPI().then((res) => {
+  if (res.code == 200) {
+    dataRes = res.data.data
+  }
+})
+//复选框变化
+const checkChange = (valList: CheckboxValueType[]) => {
+  if (valList.includes('实时水情')) {
+    props.map.addLayer(waterStore.reservoir)
+  } else {
+    props.map.removeLayer(waterStore.reservoir)
+  }
+}
+//点击事件
 const handle = () => {
   //点击失去焦点
   resetBtn.value.ref.blur()

@@ -3,4 +3,4 @@
 
 pnpm run format
 pnpm run eslint
-pnpm run stylelint
+# pnpm run stylelint

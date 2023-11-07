@@ -29,7 +29,7 @@
           :name="item.name"
         >
           <template v-slot>
-            <Water :dataRes="dataRes" />
+            <Water :dataRes="dataRes" :map="map" />
           </template>
         </el-tab-pane>
       </el-tabs>
@@ -53,6 +53,7 @@ const checkList = ref<any>([]) //多选框的值
 const flag = ref(false) //card展示
 const resetBtn = ref()
 
+//获取所有水库信息
 let dataRes: SitInfo[] = []
 getAllAPI().then((res) => {
   if (res.code == 200) {
@@ -63,6 +64,8 @@ getAllAPI().then((res) => {
 const checkChange = (valList: CheckboxValueType[]) => {
   if (valList.includes('实时水情')) {
     props.map.addLayer(waterStore.reservoir)
+    props.map.addLayer(waterStore.reservoirSign)
+    props.map.addOverlay(waterStore.popup)
   } else {
     props.map.removeLayer(waterStore.reservoir)
   }

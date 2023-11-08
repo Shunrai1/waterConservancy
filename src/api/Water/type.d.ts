@@ -26,6 +26,7 @@ export type ReservoirList = Reservoir[]
  */
 export interface SitInfo {
   stcd: string
+  // 站点名字
   stname: string
   lon: string
   lat: string

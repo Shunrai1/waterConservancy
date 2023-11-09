@@ -29,14 +29,14 @@
           :name="item.name"
         >
           <template v-slot>
-            <Water :dataRes="dataRes" />
+            <Water :dataRes="dataRes" :map="map" @auto="autoReservoirPopup" />
           </template>
         </el-tab-pane>
       </el-tabs>
     </el-card>
   </div>
   <!-- popup -->
-  <div ref="popupRef" id="popup" class="ol-popup">
+  <div v-show="popupVisible" ref="popupRef" id="popup" class="ol-popup">
     <a
       href="#"
       ref="popupCloserRef"
@@ -69,17 +69,24 @@
 </template>
 
 <script setup lang="ts">
-import * as echarts from 'echarts'
 import useWaterStore from '@/store/modules/water'
 import { List } from '@element-plus/icons-vue'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { CheckboxValueType, TabPaneName } from 'element-plus'
 import Water from './Water.vue'
-import { Reservoir, SitInfo } from '@/api/Water/type'
+import { SitInfo } from '@/api/Water/type'
 import { getAllAPI } from '@/api/Water'
-import { Overlay } from 'ol'
+import { usePopup } from '@/hooks/index'
+import { Pixel } from 'ol/pixel'
+import { Map } from 'ol'
 
-const props = defineProps(['map'])
+const $emit = defineEmits(['legend'])
+const props = defineProps({
+  map: {
+    type: Map,
+    required: true,
+  },
+})
 const waterStore = useWaterStore()
 const editList = ref<any>([]) //card的值
 const checkList = ref<any>([]) //多选框的值
@@ -88,6 +95,7 @@ const editableTabsValue = ref('1') //默认选中的tab
 const resetBtn = ref()
 let dataRes: SitInfo[] = reactive([])
 // 实现popup的html元素
+const popupVisible = ref<boolean>(false)
 const popupRef = ref()
 const popupContentRef = ref()
 const popupCloserRef = ref()
@@ -106,43 +114,29 @@ const getAllReservoir = () => {
   })
 }
 
+//点击table自动弹出水库popup
+const autoReservoirPopup = (pixel: Pixel, attribute: any) => {
+  const refs = {
+    popupRef,
+    popupContentRef,
+    popupCloserRef,
+    chart,
+    waterVisible,
+    dangerLevel,
+    currentLevel,
+    time,
+    address,
+    popupVisible,
+  }
+  usePopup(1, props.map, pixel, attribute, refs)
+}
 //水库弹出框
 const reservoirPopup = () => {
-  const overlay = new Overlay({
-    element: popupRef.value,
-    //当前窗口可见
-    autoPan: true,
-    positioning: 'bottom-center',
-  })
-  /**
-   * 添加关闭按钮的单击事件（隐藏popup）
-   * @return {boolean} Don't follow the href.
-   */
-  popupCloserRef.value.onclick = function () {
-    //未定义popup位置
-    overlay.setPosition(undefined)
-    //失去焦点
-    popupCloserRef.value.blur()
-    return false
-  }
-
-  /**
-   * 动态设置元素文本内容（兼容）
-   */
-  function setInnerText(element: any, text: any) {
-    if (typeof element.textContent == 'string') {
-      element.textContent = text
-    } else {
-      element.innerText = text
-    }
-  }
-
   /**
    * 为map添加点击事件监听，渲染弹出popup
    */
   props.map.on('click', function (evt: any) {
     console.log('popup')
-    popupContentRef.value.innerHTML = ''
 
     //判断当前单击处是否有要素，捕获到要素时弹出popup.
     //forEachFeatureAtPixel用于在指定像素位置检索地图上的要素
@@ -162,135 +156,23 @@ const reservoirPopup = () => {
 
       if (attribute.type !== 'reservoir') return
       const pLen = feature.getProperties().features.length
-      if (pLen === 1) {
-        waterVisible.value = true
-
-        // getEventPixel(evt.originalEvent) 是在地图点击事件中获取点击位置的像素坐标。
-        const pixel = props.map.getEventPixel(evt.originalEvent)
-        props.map.forEachFeatureAtPixel(pixel, function () {
-          //新增div元素
-          const elementDiv = document.createElement('div')
-          elementDiv.className = 'markerText'
-          setInnerText(elementDiv, `${attribute.userName}`)
-
-          const xAxisData = attribute.data.map((v: Reservoir) => v.tm).reverse()
-          const data = attribute.data.map((v: Reservoir) => v.rz).reverse()
-          // let normal = attribute.data[0].otq
-          // let danger = attribute.data[0].w
-          // dangerLevel.value = attribute.data[0].w
-          address.value = attribute.address
-          time.value = attribute.data[0].tm
-          currentLevel.value = attribute.data[0].rz
-          const myChart = echarts.init(chart.value)
-
-          /** @type EChartsOption */
-          const option = {
-            tooltip: {
-              trigger: 'axis',
-              axisPointer: {
-                type: 'shadow',
-              },
-            },
-            grid: {
-              left: '10%',
-              bottom: '20%',
-            },
-            xAxis: {
-              type: 'category',
-              data: xAxisData,
-            },
-            yAxis: {
-              max: 150,
-              type: 'value',
-              name: '水位/m',
-            },
-            series: [
-              {
-                name: '水位',
-                data: data,
-                type: 'bar',
-                markLine: {
-                  label: {
-                    formatter: '{b}',
-                    position: 'insideEndTop',
-                  },
-                  data: [
-                    {
-                      name: '警戒水位',
-                      yAxis: 120,
-                      lineStyle: {
-                        color: 'red',
-                        type: 'dashed',
-                      },
-                      emphasis: {
-                        lineStyle: {
-                          color: 'rgba(122, 24, 192, 1)',
-                        },
-                        label: {
-                          // 添加标题的显示内容和样式
-                          show: true,
-                          formatter: '120/m', // 标题的显示内容
-                          textStyle: {
-                            // 标题的样式
-                            color: 'rgba(122, 24, 192, 1)',
-                          },
-                        },
-                      },
-                    },
-                    {
-                      name: '正常水位',
-                      yAxis: 80,
-                      lineStyle: {
-                        color: 'rgb(39, 174, 50)',
-                        type: 'dashed',
-                      },
-                      emphasis: {
-                        lineStyle: {
-                          color: 'rgba(122, 24, 192, 1)',
-                        },
-                        label: {
-                          // 添加标题的显示内容和样式
-                          show: true,
-                          formatter: '80/m', // 标题的显示内容
-                          textStyle: {
-                            // 标题的样式
-                            color: 'rgba(122, 24, 192, 1)',
-                          },
-                        },
-                      },
-                    },
-                  ],
-
-                  // silent: true,
-                },
-              },
-            ],
-          }
-
-          option && myChart.setOption(option)
-
-          // 为content添加div子节点
-          popupContentRef.value.appendChild(elementDiv)
-          overlay.setPosition(attribute.coordinate)
-          props.map.addOverlay(overlay)
-        })
-      } else {
-        waterVisible.value = false
-        //新增div元素
-        const elementDiv = document.createElement('div')
-        elementDiv.className = 'markerText'
-        const pixel = props.map.getEventPixel(evt.originalEvent)
-        props.map.forEachFeatureAtPixel(pixel, function () {
-          setInnerText(elementDiv, `水库聚合个数: ${pLen}。 请放大`)
-          // 为content添加div子节点
-          popupContentRef.value.appendChild(elementDiv)
-
-          overlay.setPosition(attribute.coordinate)
-          props.map.addOverlay(overlay)
-        })
+      const pixel = props.map.getEventPixel(evt.originalEvent)
+      const refs = {
+        popupRef,
+        popupContentRef,
+        popupCloserRef,
+        chart,
+        waterVisible,
+        dangerLevel,
+        currentLevel,
+        time,
+        address,
+        popupVisible,
       }
+      usePopup(pLen, props.map, pixel, attribute, refs)
     } else {
-      overlay.setPosition(undefined)
+      // overlay.setPosition(undefined)
+      return false
     }
   })
   /**
@@ -307,8 +189,10 @@ const reservoirPopup = () => {
 const checkChange = (valList: CheckboxValueType[]) => {
   if (valList.includes('实时水情')) {
     props.map.addLayer(waterStore.reservoir)
+    $emit('legend')
   } else {
     props.map.removeLayer(waterStore.reservoir)
+    $emit('legend')
   }
 }
 //list的icon点击事件

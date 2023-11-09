@@ -5,7 +5,7 @@
       <span class="zhuangzu">Shui Li Vahc Yitxinz Vahc Vunz Nghienz</span>
     </div>
     <!-- 右侧操作选择面板 -->
-    <Opration :map="map" />
+    <Opration :map="map!" @legend="getLegend" />
     <div class="basemap">
       <div class="vector" title="显示矢量标注地图" @click="invisibelVector">
         <img
@@ -29,15 +29,37 @@
         />
       </div>
     </div>
-    <div class="legend"></div>
+    <!-- 图例 -->
+    <el-card class="legend">
+      <template #header>
+        <div class="card-header">
+          <span>图例</span>
+        </div>
+      </template>
+      <table class="table" id="table">
+        <!-- <tr>
+          <td>你好</td>
+          <td>e好啊</td>
+        </tr>
+        <tr>
+          <td>你好</td>
+          <td>，好啊</td>
+        </tr>
+        <tr>
+          <td>你好</td>
+          <td>你好，好啊</td>
+        </tr> -->
+      </table>
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import useWaterStore from '@/store/modules/water'
+import { nextTick, onMounted, ref } from 'vue'
 import Opration from './components/Opration.vue'
 //openlayers的API
-import { Map, View } from 'ol'
+import { Feature, Map, View } from 'ol'
 import TileLayer from 'ol/layer/Tile'
 import XYZ from 'ol/source/XYZ'
 import { defaults, Zoom, ZoomToExtent } from 'ol/control'
@@ -46,8 +68,23 @@ import GeoJSON from 'ol/format/GeoJSON'
 import VectorLayer from 'ol/layer/Vector'
 import Style from 'ol/style/Style'
 import Stroke from 'ol/style/Stroke'
-import { fromLonLat } from 'ol/proj'
+import { Projection, fromLonLat } from 'ol/proj'
+import { Icon } from 'ol/style'
+import {
+  LineString,
+  MultiLineString,
+  MultiPoint,
+  Point,
+  Polygon,
+} from 'ol/geom'
 
+import Vector from 'ol/source/Vector'
+import { ImageStatic } from 'ol/source'
+import { Image } from 'ol/layer'
+import { getCenter } from 'ol/extent'
+import ImageStyle from 'ol/style/Image'
+
+const waterStore = useWaterStore()
 const centerCoordinate = ref([109.079829, 23.770015])
 const zoom = ref(8)
 const view = ref<View>()
@@ -60,6 +97,201 @@ const mapRef = ref()
 const guanxiVector = ref<VectorLayer<any>>()
 
 // 方法
+//图例
+const getLegend = () => {
+  const layers = map.value!.getAllLayers()
+  const legendRows: any = []
+  let row = {
+    style: new Style(undefined),
+    title: '',
+    geomType: '',
+  }
+  layers.forEach((lyr) => {
+    if (lyr instanceof VectorLayer) {
+      const styleFunction: any = lyr.getStyle()
+      // 检查使用的样式类型并存储在数组中
+      let style: Style | null = null
+      let image: ImageStyle | null = null
+
+      console.log('function?', styleFunction)
+      // map.value!.getFeatures(pixel)
+      const extent = view.value!.calculateExtent(map.value!.getSize())
+      console.log(extent, 'extetn')
+      // const extent = [xmin, ymin, xmax, ymax];
+      map.value?.on('rendercomplete', () => {
+        const features = waterStore.reservoir
+          ?.getSource()
+          .getFeaturesInExtent(extent)
+        console.log(features, '22')
+        let feature
+        if (features) {
+          feature = features[0]
+        }
+        style = styleFunction(feature)
+        console.log(style instanceof Style)
+        if (style) {
+          image = style.getImage()
+        }
+        // let style = styleFunction()
+        // let image = styleFunction().getImage()
+        // let style: any = null
+        // let image: any = null
+        if (image) {
+          if (image instanceof Icon) {
+            //raster icon from url
+            const icon2 = new Icon({
+              src: image.getSrc(),
+            })
+            const iconStyle2 = new Style({
+              image: icon2,
+            })
+            row = {
+              style: new Style(undefined),
+              title: '',
+              geomType: '',
+            }
+            row.style = iconStyle2
+            row.title = lyr.get('title')
+          } else {
+            //ol.style.RegularShape?
+            row = {
+              style: new Style(undefined),
+              title: '',
+              geomType: '',
+            }
+            if (style instanceof Style) {
+              row.style = style
+            }
+            row.title = lyr.get('title')
+          }
+        } else {
+          row = {
+            style: new Style(undefined),
+            title: '',
+            geomType: '',
+          }
+          if (style instanceof Style) {
+            row.style = style
+          }
+          row.title = lyr.get('title')
+        }
+      })
+
+      // 再存储几何类型
+      //geometry type
+      //地图渲染完，执行
+      console.log('22')
+      map.value?.once('rendercomplete', () => {
+        const feats = lyr.getSource().getFeatures()
+        if (feats && feats.length > 0) {
+          if (
+            feats[0].getGeometry() instanceof Point ||
+            feats[0].getGeometry() instanceof MultiPoint
+          ) {
+            row.geomType = 'point'
+          } else if (
+            feats[0].getGeometry() instanceof LineString ||
+            feats[0].getGeometry() instanceof MultiLineString
+          ) {
+            row.geomType = 'line'
+          } else {
+            row.geomType = 'polygon'
+          }
+        }
+        if (!legendRows.includes(row)) {
+          legendRows.push(row)
+        }
+        console.log(legendRows)
+        console.log('style:', legendRows[0].style)
+
+        // 遍历存储的图例行并构建所需的 HTML 元素，通常是“迷你 map ”的 div 和图层名称
+        const tble = document.getElementById('table')
+        for (let i = 0; i < legendRows.length; i++) {
+          console.log('add')
+          const row = document.createElement('tr')
+          //symbol
+          let cell: any = document.createElement('td')
+          cell.style = 'width:35px'
+          const div: any = document.createElement('div')
+          div.style = 'width:32px; height:32px;'
+          div.id = 'mapLegendRowSymbolDiv' + i
+          tble!.appendChild(row)
+          row.appendChild(cell)
+          cell.appendChild(div)
+          //layer title
+          cell = document.createElement('td')
+          tble!.appendChild(row)
+          row.appendChild(cell)
+          cell.innerHTML = legendRows[i].title
+        }
+
+        // 将 HTML 元素添加到页面后，启动 map 并插入假特征以显示符号
+        //loop legend rows and and insert the maps
+        const extent = [0, 0, 32, 32]
+        const projection = new Projection({
+          code: 'xkcd-image',
+          units: 'pixels',
+          extent: extent,
+        })
+        for (let i = 0; i < legendRows.length; i++) {
+          //target div
+          const targetDiv = document.getElementById('mapLegendRowSymbolDiv' + i)
+          //layer for icon
+          const sourceLegend = new Vector({ wrapX: false })
+          const vectorLegend = new VectorLayer({
+            source: sourceLegend,
+            style: legendRows[i].style,
+          })
+          //map
+          // const mapLegend = new Map({
+          //   controls: [],
+          //   layers: [
+          //     new Image({
+          //       source: new ImageStatic({
+          //         projection: projection,
+          //         imageExtent: extent,
+          //         url: '',
+          //       }),
+          //     }),
+          //     vectorLegend,
+          //   ],
+          //   target: targetDiv!,
+          //   view: new View({
+          //     projection: projection,
+          //     center: getCenter(extent),
+          //     zoom: 2,
+          //     maxZoom: 2,
+          //   }),
+          // })
+          //icon feature depending on type
+          let geom
+          if (legendRows[i].geomType == 'point') {
+            geom = new Point([16, 16])
+          } else if (legendRows[i].geomType == 'polygon') {
+            const polyCoords = []
+            polyCoords.push([15.7, 15.7])
+            polyCoords.push([16.3, 15.7])
+            polyCoords.push([16.3, 16.3])
+            polyCoords.push([15.7, 16.3])
+            polyCoords.push([15.7, 15.7])
+            geom = new Polygon([polyCoords])
+          } else {
+            const lineCoords = []
+            lineCoords.push([15.6, 15.6])
+            lineCoords.push([16, 16])
+            lineCoords.push([16, 15.8])
+            lineCoords.push([16.4, 16.2])
+            geom = new LineString(lineCoords)
+          }
+          const feature = new Feature({
+            geometry: geom,
+          })
+          vectorLegend.getSource()!.addFeature(feature)
+        }
+      })
+    }
+  })
+}
 //定义大屏缩放比例
 function getScale(w = 1920, h = 1080) {
   const ww = window.innerWidth / w
@@ -87,7 +319,6 @@ const invisibelVector = () => {
   vectorSign.value?.setVisible(true)
   gaode.value?.setVisible(false)
 }
-
 // 初始化地图
 const initMap = () => {
   //视图
@@ -129,11 +360,15 @@ const initMap = () => {
     url: 'src/assets/data/data.json',
   })
   guanxiVector.value = new VectorLayer({
+    properties: {
+      title: '广西省',
+    },
     source: source,
     style: function () {
       return new Style({
         stroke: new Stroke({
-          color: 'balck',
+          color: 'red',
+          width: 5,
         }),
       })
     },
@@ -162,7 +397,7 @@ const initMap = () => {
     ]),
   })
 
-  //获取当前地图范围
+  //获取当前地图范围(extent:返回的值是一个由最小经度、最小纬度、最大经度和最大纬度组成的数组，)
   const extent = view.value.calculateExtent(map.value.getSize())
   map.value.addControl(
     new ZoomToExtent({
@@ -175,6 +410,16 @@ const initMap = () => {
 //生命周期
 onMounted(() => {
   initMap()
+  map.value?.on('change:view', () => {
+    console.log('mapComplete')
+  })
+  map.value?.on('click', () => {
+    console.log('有用?')
+  })
+  invisibelVector()
+  nextTick(() => {
+    getLegend()
+  })
   mapRef.value.style.transform = `scale(${getScale()}) translate(-50%,-50%)`
 })
 window.onresize = () => {
@@ -236,7 +481,7 @@ window.onresize = () => {
 
     .vector {
       position: absolute;
-      top: 80%;
+      top: 85%;
       z-index: 4;
       width: 53px;
       height: 53px;
@@ -245,7 +490,7 @@ window.onresize = () => {
 
     .image {
       position: absolute;
-      top: 90%;
+      top: 93%;
       z-index: 4;
       width: 53px;
       height: 53px;
@@ -254,11 +499,26 @@ window.onresize = () => {
 
     .gaodeVector {
       position: absolute;
-      top: 70%;
+      top: 77%;
       z-index: 4;
       width: 53px;
       height: 53px;
       box-shadow: 0 0 10px rgb(0 0 0 / 100%);
+    }
+  }
+  .legend {
+    position: absolute;
+    top: 77%;
+    left: 5%;
+    z-index: 4;
+    height: 225px;
+    width: 225px;
+    background-color: rgb(66, 62, 62);
+    color: white;
+    .table {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
     }
   }
 }

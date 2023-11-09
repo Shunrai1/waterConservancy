@@ -20,6 +20,8 @@
     :data="tableData"
     border
     style="width: 100%; margin: 10px 0"
+    @row-click="reservoirRow"
+    highlight-current-row
   >
     <el-table-column type="index" label="序列" width="60"></el-table-column>
     <el-table-column prop="stname" label="站名" width="150" />
@@ -48,7 +50,7 @@ import { onMounted, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { getReservoirDataAPI, searchAPI } from '@/api/Water/index'
 import { SitInfo } from '@/api/Water/type'
-import { Feature } from 'ol'
+import { Feature, Map } from 'ol'
 import { Point } from 'ol/geom'
 import { Cluster } from 'ol/source'
 import { Vector as VectorLayer } from 'ol/layer'
@@ -57,6 +59,7 @@ import { Style, Stroke, Fill, Text, RegularShape } from 'ol/style'
 import useWaterStore from '@/store/modules/water'
 import { fromLonLat } from 'ol/proj'
 
+const $emit = defineEmits(['auto'])
 const waterStore = useWaterStore()
 const radio = ref(3)
 const waterSearch = ref('')
@@ -70,8 +73,29 @@ const props = defineProps({
     type: Object as () => SitInfo[],
     required: true,
   },
+  map: {
+    type: Map,
+    required: true,
+  },
 })
 
+//水库行点击事件
+const reservoirRow = (row: SitInfo) => {
+  const view = props.map.getView()
+  view.setCenter(fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]))
+  view.setZoom(12)
+  //地图移动事件结束后，执行回调函数
+  props.map.once('moveend', () => {
+    const attr = {
+      userName: `${row.stname}-水位图`,
+      address: `${row.city}${row.address}`,
+      data: row.rsvrrTM,
+      coordinate: fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]),
+      type: 'reservoir',
+    }
+    $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
+  })
+}
 //初始化水库图层
 const initReservoirLayer = () => {
   //此示例创建多个要素
@@ -113,6 +137,9 @@ const initReservoirLayer = () => {
   //加载聚合标注的矢量图层
   const styleCache: any = {}
   const clusters = new VectorLayer({
+    properties: {
+      title: '水库',
+    },
     source: clusterSource,
     style: function (feature) {
       //获取每个聚合标注要素的features属性，含有多少个feature

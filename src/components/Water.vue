@@ -60,6 +60,7 @@ import useWaterStore from '@/store/modules/water'
 import { fromLonLat } from 'ol/proj'
 
 const $emit = defineEmits(['auto'])
+
 const waterStore = useWaterStore()
 const radio = ref(3)
 const waterSearch = ref('')
@@ -99,7 +100,6 @@ const reservoirRow = (row: SitInfo) => {
 //初始化水库图层
 const initReservoirLayer = () => {
   //此示例创建多个要素
-
   const count = props.dataRes.length
   const features = new Array(count)
 

@@ -79,7 +79,10 @@ import { getAllAPI } from '@/api/Water'
 import { usePopup } from '@/hooks/index'
 import { Pixel } from 'ol/pixel'
 import { Map } from 'ol'
+import useLegendStore from '@/store/modules/legend'
+import { Fill, RegularShape, Stroke, Style } from 'ol/style'
 
+const legendStore = useLegendStore()
 const $emit = defineEmits(['legend'])
 const props = defineProps({
   map: {
@@ -189,9 +192,27 @@ const reservoirPopup = () => {
 const checkChange = (valList: CheckboxValueType[]) => {
   if (valList.includes('实时水情')) {
     props.map.addLayer(waterStore.reservoir)
+    legendStore.addLegend({
+      title: '水库',
+      style: new Style({
+        image: new RegularShape({
+          fill: new Fill({
+            color: '#3399CC',
+          }),
+          stroke: new Stroke({
+            color: '#fff',
+          }),
+          points: 3, // 三角形的边数
+          radius: 10, // 三角形的半径
+          angle: 0, // 三角形的旋转角度
+        }),
+      }),
+      geomType: 'point',
+    })
     $emit('legend')
   } else {
     props.map.removeLayer(waterStore.reservoir)
+    legendStore.removeLegend('水库')
     $emit('legend')
   }
 }

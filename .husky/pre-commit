@@ -2,5 +2,5 @@
 . "$(dirname -- "$0")/_/husky.sh"
 
 pnpm run format
-# pnpm run eslint
+pnpm run eslint
 # pnpm run stylelint

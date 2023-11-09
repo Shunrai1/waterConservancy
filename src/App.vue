@@ -55,7 +55,8 @@
 </template>
 
 <script setup lang="ts">
-import useWaterStore from '@/store/modules/water'
+import useLegendStore from '@/store/modules/legend'
+// import useWaterStore from '@/store/modules/water'
 import { nextTick, onMounted, ref } from 'vue'
 import Opration from './components/Opration.vue'
 //openlayers的API
@@ -66,25 +67,18 @@ import { defaults, Zoom, ZoomToExtent } from 'ol/control'
 import VectorSource from 'ol/source/Vector'
 import GeoJSON from 'ol/format/GeoJSON'
 import VectorLayer from 'ol/layer/Vector'
-import Style from 'ol/style/Style'
+import Style, { StyleLike } from 'ol/style/Style'
 import Stroke from 'ol/style/Stroke'
 import { Projection, fromLonLat } from 'ol/proj'
-import { Icon } from 'ol/style'
-import {
-  LineString,
-  MultiLineString,
-  MultiPoint,
-  Point,
-  Polygon,
-} from 'ol/geom'
+import { LineString, Point, Polygon } from 'ol/geom'
 
 import Vector from 'ol/source/Vector'
 import { ImageStatic } from 'ol/source'
 import { Image } from 'ol/layer'
 import { getCenter } from 'ol/extent'
-import ImageStyle from 'ol/style/Image'
 
-const waterStore = useWaterStore()
+const legendStore = useLegendStore()
+// const waterStore = useWaterStore()
 const centerCoordinate = ref([109.079829, 23.770015])
 const zoom = ref(8)
 const view = ref<View>()
@@ -99,198 +93,95 @@ const guanxiVector = ref<VectorLayer<any>>()
 // 方法
 //图例
 const getLegend = () => {
-  const layers = map.value!.getAllLayers()
-  const legendRows: any = []
-  let row = {
-    style: new Style(undefined),
-    title: '',
-    geomType: '',
+  const legendRows = legendStore.legendList
+  console.log(legendRows)
+  // 遍历存储的图例行并构建所需的 HTML 元素，通常是“迷你 map ”的 div 和图层名称
+  const tble = document.getElementById('table')
+  tble!.innerHTML = ''
+  for (let i = 0; i < legendRows.length; i++) {
+    console.log('add')
+    const row = document.createElement('tr')
+    //symbol
+    let cell: any = document.createElement('td')
+    // cell.style = 'width:35px;height:35px'
+    const div: any = document.createElement('div')
+    div.style = 'width:32px; height:32px;'
+    div.id = 'mapLegendRowSymbolDiv' + i
+    tble!.appendChild(row)
+    row.appendChild(cell)
+    cell.appendChild(div)
+    //layer title
+    cell = document.createElement('td')
+    cell.style = 'vertical-align: middle;marign-left:2px;'
+    tble!.appendChild(row)
+    row.appendChild(cell)
+    cell.innerHTML = legendRows[i].title
   }
-  layers.forEach((lyr) => {
-    if (lyr instanceof VectorLayer) {
-      const styleFunction: any = lyr.getStyle()
-      // 检查使用的样式类型并存储在数组中
-      let style: Style | null = null
-      let image: ImageStyle | null = null
 
-      console.log('function?', styleFunction)
-      // map.value!.getFeatures(pixel)
-      const extent = view.value!.calculateExtent(map.value!.getSize())
-      console.log(extent, 'extetn')
-      // const extent = [xmin, ymin, xmax, ymax];
-      map.value?.on('rendercomplete', () => {
-        const features = waterStore.reservoir
-          ?.getSource()
-          .getFeaturesInExtent(extent)
-        console.log(features, '22')
-        let feature
-        if (features) {
-          feature = features[0]
-        }
-        style = styleFunction(feature)
-        console.log(style instanceof Style)
-        if (style) {
-          image = style.getImage()
-        }
-        // let style = styleFunction()
-        // let image = styleFunction().getImage()
-        // let style: any = null
-        // let image: any = null
-        if (image) {
-          if (image instanceof Icon) {
-            //raster icon from url
-            const icon2 = new Icon({
-              src: image.getSrc(),
-            })
-            const iconStyle2 = new Style({
-              image: icon2,
-            })
-            row = {
-              style: new Style(undefined),
-              title: '',
-              geomType: '',
-            }
-            row.style = iconStyle2
-            row.title = lyr.get('title')
-          } else {
-            //ol.style.RegularShape?
-            row = {
-              style: new Style(undefined),
-              title: '',
-              geomType: '',
-            }
-            if (style instanceof Style) {
-              row.style = style
-            }
-            row.title = lyr.get('title')
-          }
-        } else {
-          row = {
-            style: new Style(undefined),
-            title: '',
-            geomType: '',
-          }
-          if (style instanceof Style) {
-            row.style = style
-          }
-          row.title = lyr.get('title')
-        }
-      })
-
-      // 再存储几何类型
-      //geometry type
-      //地图渲染完，执行
-      console.log('22')
-      map.value?.once('rendercomplete', () => {
-        const feats = lyr.getSource().getFeatures()
-        if (feats && feats.length > 0) {
-          if (
-            feats[0].getGeometry() instanceof Point ||
-            feats[0].getGeometry() instanceof MultiPoint
-          ) {
-            row.geomType = 'point'
-          } else if (
-            feats[0].getGeometry() instanceof LineString ||
-            feats[0].getGeometry() instanceof MultiLineString
-          ) {
-            row.geomType = 'line'
-          } else {
-            row.geomType = 'polygon'
-          }
-        }
-        if (!legendRows.includes(row)) {
-          legendRows.push(row)
-        }
-        console.log(legendRows)
-        console.log('style:', legendRows[0].style)
-
-        // 遍历存储的图例行并构建所需的 HTML 元素，通常是“迷你 map ”的 div 和图层名称
-        const tble = document.getElementById('table')
-        for (let i = 0; i < legendRows.length; i++) {
-          console.log('add')
-          const row = document.createElement('tr')
-          //symbol
-          let cell: any = document.createElement('td')
-          cell.style = 'width:35px'
-          const div: any = document.createElement('div')
-          div.style = 'width:32px; height:32px;'
-          div.id = 'mapLegendRowSymbolDiv' + i
-          tble!.appendChild(row)
-          row.appendChild(cell)
-          cell.appendChild(div)
-          //layer title
-          cell = document.createElement('td')
-          tble!.appendChild(row)
-          row.appendChild(cell)
-          cell.innerHTML = legendRows[i].title
-        }
-
-        // 将 HTML 元素添加到页面后，启动 map 并插入假特征以显示符号
-        //loop legend rows and and insert the maps
-        const extent = [0, 0, 32, 32]
-        const projection = new Projection({
-          code: 'xkcd-image',
-          units: 'pixels',
-          extent: extent,
-        })
-        for (let i = 0; i < legendRows.length; i++) {
-          //target div
-          const targetDiv = document.getElementById('mapLegendRowSymbolDiv' + i)
-          //layer for icon
-          const sourceLegend = new Vector({ wrapX: false })
-          const vectorLegend = new VectorLayer({
-            source: sourceLegend,
-            style: legendRows[i].style,
-          })
-          //map
-          // const mapLegend = new Map({
-          //   controls: [],
-          //   layers: [
-          //     new Image({
-          //       source: new ImageStatic({
-          //         projection: projection,
-          //         imageExtent: extent,
-          //         url: '',
-          //       }),
-          //     }),
-          //     vectorLegend,
-          //   ],
-          //   target: targetDiv!,
-          //   view: new View({
-          //     projection: projection,
-          //     center: getCenter(extent),
-          //     zoom: 2,
-          //     maxZoom: 2,
-          //   }),
-          // })
-          //icon feature depending on type
-          let geom
-          if (legendRows[i].geomType == 'point') {
-            geom = new Point([16, 16])
-          } else if (legendRows[i].geomType == 'polygon') {
-            const polyCoords = []
-            polyCoords.push([15.7, 15.7])
-            polyCoords.push([16.3, 15.7])
-            polyCoords.push([16.3, 16.3])
-            polyCoords.push([15.7, 16.3])
-            polyCoords.push([15.7, 15.7])
-            geom = new Polygon([polyCoords])
-          } else {
-            const lineCoords = []
-            lineCoords.push([15.6, 15.6])
-            lineCoords.push([16, 16])
-            lineCoords.push([16, 15.8])
-            lineCoords.push([16.4, 16.2])
-            geom = new LineString(lineCoords)
-          }
-          const feature = new Feature({
-            geometry: geom,
-          })
-          vectorLegend.getSource()!.addFeature(feature)
-        }
-      })
-    }
+  // 将 HTML 元素添加到页面后，启动 map 并插入假特征以显示符号
+  //loop legend rows and and insert the maps
+  const extent = [0, 0, 32, 32]
+  const projection = new Projection({
+    code: 'xkcd-image',
+    units: 'pixels',
+    extent: extent,
   })
+  for (let i = 0; i < legendRows.length; i++) {
+    //target div
+    const targetDiv = document.getElementById('mapLegendRowSymbolDiv' + i)
+    //layer for icon
+    const sourceLegend = new Vector({ wrapX: false })
+
+    const vectorLegend = new VectorLayer({
+      source: sourceLegend,
+      style: legendRows[i].style as StyleLike,
+    })
+    //map
+    new Map({
+      controls: [],
+      layers: [
+        new Image({
+          source: new ImageStatic({
+            projection: projection,
+            imageExtent: extent,
+            url: '',
+          }),
+        }),
+        vectorLegend,
+      ],
+      target: targetDiv!,
+      view: new View({
+        projection: projection,
+        center: getCenter(extent),
+        zoom: 2,
+        maxZoom: 2,
+      }),
+    })
+    //icon feature depending on type
+    let geom
+    if (legendRows[i].geomType == 'point') {
+      geom = new Point([16, 16])
+    } else if (legendRows[i].geomType == 'polygon') {
+      const polyCoords = []
+      polyCoords.push([15.7, 15.7])
+      polyCoords.push([16.3, 15.7])
+      polyCoords.push([16.3, 16.3])
+      polyCoords.push([15.7, 16.3])
+      polyCoords.push([15.7, 15.7])
+      geom = new Polygon([polyCoords])
+    } else {
+      const lineCoords = []
+      lineCoords.push([15.6, 15.6])
+      lineCoords.push([16, 16])
+      lineCoords.push([16, 15.8])
+      lineCoords.push([16.4, 16.2])
+      geom = new LineString(lineCoords)
+    }
+    const feature = new Feature({
+      geometry: geom,
+    })
+    vectorLegend.getSource()!.addFeature(feature)
+  }
 }
 //定义大屏缩放比例
 function getScale(w = 1920, h = 1080) {
@@ -372,6 +263,17 @@ const initMap = () => {
         }),
       })
     },
+  })
+  //添加图例到仓库
+  legendStore.addLegend({
+    title: '广西省',
+    geomType: 'polygon',
+    style: new Style({
+      stroke: new Stroke({
+        color: 'red',
+        width: 5,
+      }),
+    }),
   })
 
   //地图对象

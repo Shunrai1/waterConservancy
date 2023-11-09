@@ -15,6 +15,16 @@ export type Reservoir = {
   otq: number
   w: number
 }
+/**
+ * 河流信息
+ */
+export type River = {
+  id: number
+  stcd: string
+  tm: string
+  z: number
+  q: number
+}
 
 /**
  * 水库信息列表
@@ -22,7 +32,12 @@ export type Reservoir = {
 export type ReservoirList = Reservoir[]
 
 /**
- * 站点水库信息
+ * 河流信息列表
+ */
+export type RiverList = River[]
+
+/**
+ * 站点水库河流信息
  */
 export interface SitInfo {
   stcd: string
@@ -36,6 +51,7 @@ export interface SitInfo {
   substation: string
   address: string
   rsvrrTM: ReservoirList
+  riverrTM: RiverList
 }
 
 /**

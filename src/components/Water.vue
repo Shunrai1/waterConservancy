@@ -1,6 +1,6 @@
 <template>
   <div class="top">
-    <el-radio-group v-model="radio">
+    <el-radio-group v-model="radio" @change="radioChange">
       <el-radio :label="3">水库</el-radio>
       <el-radio :label="6">河流</el-radio>
     </el-radio-group>
@@ -24,6 +24,75 @@
     highlight-current-row
   >
     <el-table-column type="index" label="序列" width="60"></el-table-column>
+    <el-table-column v-if="radio == 3" prop="stname" label="站名" width="150" />
+    <el-table-column
+      v-if="radio == 6"
+      prop="rivername"
+      label="河流名"
+      width="150"
+    />
+    <el-table-column prop="city" label="所属地市" width="150" />
+    <el-table-column prop="substation" label="所属分局" width="180" />
+    <el-table-column prop="address" label="具体位置" width="180" />
+    <el-table-column
+      v-if="radio == 3"
+      prop="rsvrrTM[0].tm"
+      label="时间"
+      width="180"
+    />
+    <el-table-column
+      v-if="radio == 3"
+      prop="rsvrrTM[0].rz"
+      label="水位/m"
+      width="180"
+    />
+    <el-table-column
+      v-if="radio == 3"
+      prop="rsvrrTM[0].inq"
+      label="流量(m3/s)"
+      width="180"
+    />
+    <el-table-column
+      v-if="radio == 3"
+      prop="rsvrrTM[0].otq"
+      label="正常水位/m"
+      width="180"
+    />
+    <el-table-column
+      v-if="radio == 3"
+      prop="rsvrrTM[0].w"
+      label="警戒水位/m"
+      width="180"
+    />
+    <el-table-column
+      v-if="radio == 6"
+      prop="riverrTM[0].tm"
+      label="时间"
+      width="180"
+    />
+    <el-table-column
+      v-if="radio == 6"
+      prop="riverrTM[0].z"
+      label="水位/m"
+      width="180"
+    />
+    <el-table-column
+      v-if="radio == 6"
+      prop="riverrTM[0].q"
+      label="正常水位/m"
+      width="180"
+    />
+  </el-table>
+  <!-- 河流表 -->
+  <!-- <el-table
+    ref="tableRef"
+    :data="riverData"
+    border
+    style="width: 100%; margin: 10px 0"
+    @row-click="reservoirRow"
+    highlight-current-row
+  >
+    <el-table-column type="index" label="序列" width="60"></el-table-column>
     <el-table-column prop="stname" label="站名" width="150" />
     <el-table-column prop="city" label="所属地市" width="150" />
     <el-table-column prop="substation" label="所属分局" width="180" />
@@ -33,7 +102,7 @@
     <el-table-column prop="rsvrrTM[0].inq" label="流量(m3/s)" width="180" />
     <el-table-column prop="rsvrrTM[0].otq" label="正常水位/m" width="180" />
     <el-table-column prop="rsvrrTM[0].w" label="警戒水位/m" width="180" />
-  </el-table>
+  </el-table> -->
   <el-pagination
     background
     v-model:page-size="pageSize"
@@ -48,7 +117,12 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
-import { getReservoirDataAPI, searchAPI } from '@/api/Water/index'
+import {
+  RiverSearchAPI,
+  getReservoirDataAPI,
+  getRiverDataAPI,
+  searchAPI,
+} from '@/api/Water/index'
 import { SitInfo } from '@/api/Water/type'
 import { Feature, Map } from 'ol'
 import { Point } from 'ol/geom'
@@ -58,19 +132,22 @@ import { Vector } from 'ol/source'
 import { Style, Stroke, Fill, Text, RegularShape } from 'ol/style'
 import useWaterStore from '@/store/modules/water'
 import { fromLonLat } from 'ol/proj'
+import { riverStyle } from '@/utils/style'
 
 const $emit = defineEmits(['auto'])
-
 const waterStore = useWaterStore()
 const radio = ref(3)
 const waterSearch = ref('')
 const pageSize = ref(7)
 const currentPage = ref(1)
 const total = ref(10)
-//水库数据
 const tableData = ref<SitInfo[]>([])
 const props = defineProps({
   dataRes: {
+    type: Object as () => SitInfo[],
+    required: true,
+  },
+  riverRes: {
     type: Object as () => SitInfo[],
     required: true,
   },
@@ -80,6 +157,10 @@ const props = defineProps({
   },
 })
 
+//radio改变事件
+const radioChange = () => {
+  initData(1)
+}
 //水库行点击事件
 const reservoirRow = (row: SitInfo) => {
   const view = props.map.getView()
@@ -87,14 +168,25 @@ const reservoirRow = (row: SitInfo) => {
   view.setZoom(12)
   //地图移动事件结束后，执行回调函数
   props.map.once('moveend', () => {
-    const attr = {
-      userName: `${row.stname}-水位图`,
-      address: `${row.city}${row.address}`,
-      data: row.rsvrrTM,
-      coordinate: fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]),
-      type: 'reservoir',
+    if (radio.value == 3) {
+      const attr = {
+        userName: `${row.stname}-水位图`,
+        address: `${row.city}${row.address}`,
+        data: row.rsvrrTM,
+        coordinate: fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]),
+        type: 'reservoir',
+      }
+      $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
+    } else {
+      const attr = {
+        userName: `${row.rivername}-水位图`,
+        address: `${row.city}${row.address}`,
+        data: row.riverrTM,
+        coordinate: fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]),
+        type: 'river',
+      }
+      $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
     }
-    $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
   })
 }
 //初始化水库图层
@@ -177,9 +269,60 @@ const initReservoirLayer = () => {
   //存储图层
   waterStore.setReservoir(clusters)
 }
+//初始化河流图层
+const initRiverLayer = () => {
+  //此示例创建多个要素
+
+  const count = props.riverRes.length
+
+  const features = new Array(count)
+
+  for (let i = 0; i < count; ++i) {
+    const coordinates = fromLonLat([
+      parseFloat(props.riverRes[i].lon),
+      parseFloat(props.riverRes[i].lat),
+    ])
+
+    const attr = {
+      userName: `${props.riverRes[i].rivername}-水位图`,
+      address: `${props.riverRes[i].city}${props.riverRes[i].address}`,
+      data: props.riverRes[i].riverrTM,
+      coordinate: fromLonLat(coordinates, 'EPSG:4326'),
+      type: 'river',
+    }
+    features[i] = new Feature({
+      geometry: new Point(coordinates),
+      attribute: attr,
+    })
+  }
+
+  //矢量要素数据源
+  const source = new Vector({
+    features: features,
+  })
+
+  //加载矢量图层
+  const riverLayer = new VectorLayer({
+    zIndex: 100,
+    properties: {
+      title: '河流',
+    },
+    source: source,
+    style: riverStyle,
+  })
+
+  //存储图层
+  waterStore.setRiverLayer(riverLayer)
+}
 //当前页数改变
 const currentChange = (val: any) => {
   if (radio.value == 3) {
+    if (waterSearch.value != '') {
+      handleSearch(undefined, val)
+    } else {
+      initData(val)
+    }
+  } else {
     if (waterSearch.value != '') {
       handleSearch(undefined, val)
     } else {
@@ -196,6 +339,13 @@ const handleSearch = async (_event: any, pager = 1) => {
       total.value = res.data.total
       tableData.value = res.data.data
     }
+  } else {
+    currentPage.value = pager
+    const res = await RiverSearchAPI(waterSearch.value, pageSize.value, pager)
+    if (res.code == 200) {
+      total.value = res.data.total
+      tableData.value = res.data.data
+    }
   }
 }
 const initData = async (pager = 1) => {
@@ -207,12 +357,20 @@ const initData = async (pager = 1) => {
       total.value = res.data.total
       tableData.value = res.data.data
     }
+  } else {
+    //河流数据
+    const res = await getRiverDataAPI(pageSize.value, currentPage.value)
+    if (res.code == 200) {
+      total.value = res.data.total
+      tableData.value = res.data.data
+    }
   }
 }
 
 onMounted(() => {
   initData()
   initReservoirLayer()
+  initRiverLayer()
 })
 </script>
 

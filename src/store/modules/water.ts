@@ -7,12 +7,20 @@ import { Overlay } from 'ol'
 const useWaterStore = defineStore('Water', {
   state: (): WaterState => {
     return {
+      river: null,
       reservoir: null,
       reservoirSign: null,
       popup: null,
     }
   },
   actions: {
+    /**
+     * 存储河流图层数据
+     * @param riverLayer
+     */
+    setRiverLayer(riverLayer: Vector<any>) {
+      this.river = riverLayer
+    },
     //存储水库聚合图层数据
     setReservoir(reservoir: Vector<Cluster>) {
       this.reservoir = reservoir

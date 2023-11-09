@@ -29,7 +29,12 @@
           :name="item.name"
         >
           <template v-slot>
-            <Water :dataRes="dataRes" :map="map" @auto="autoReservoirPopup" />
+            <Water
+              :dataRes="dataRes"
+              :map="map"
+              @auto="autoReservoirPopup"
+              :riverRes="riverRes"
+            />
           </template>
         </el-tab-pane>
       </el-tabs>
@@ -75,12 +80,13 @@ import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { CheckboxValueType, TabPaneName } from 'element-plus'
 import Water from './Water.vue'
 import { SitInfo } from '@/api/Water/type'
-import { getAllAPI } from '@/api/Water'
+import { getAllAPI, getRiverAllAPI } from '@/api/Water'
 import { usePopup } from '@/hooks/index'
 import { Pixel } from 'ol/pixel'
 import { Map } from 'ol'
 import useLegendStore from '@/store/modules/legend'
-import { Fill, RegularShape, Stroke, Style } from 'ol/style'
+
+import { reservoirStyle, riverStyle } from '@/utils/style'
 
 const legendStore = useLegendStore()
 const $emit = defineEmits(['legend'])
@@ -97,6 +103,7 @@ const flag = ref(false) //card展示
 const editableTabsValue = ref('1') //默认选中的tab
 const resetBtn = ref()
 let dataRes: SitInfo[] = reactive([])
+let riverRes: SitInfo[] = reactive([])
 // 实现popup的html元素
 const popupVisible = ref<boolean>(false)
 const popupRef = ref()
@@ -108,6 +115,15 @@ const dangerLevel = ref<number>(120) //危险水位
 const currentLevel = ref<number>(100) //目前水位
 const time = ref()
 const address = ref()
+
+//获取所有河流信息
+const getAllRiver = () => {
+  getRiverAllAPI().then((res) => {
+    if (res.code == 200) {
+      riverRes = res.data.data
+    }
+  })
+}
 //获取所有水库信息
 const getAllReservoir = () => {
   getAllAPI().then((res) => {
@@ -116,7 +132,6 @@ const getAllReservoir = () => {
     }
   })
 }
-
 //点击table自动弹出水库popup
 const autoReservoirPopup = (pixel: Pixel, attribute: any) => {
   const refs = {
@@ -131,7 +146,11 @@ const autoReservoirPopup = (pixel: Pixel, attribute: any) => {
     address,
     popupVisible,
   }
-  usePopup(1, props.map, pixel, attribute, refs)
+  if (attribute.type == 'reservoir') {
+    usePopup(1, props.map, pixel, attribute, refs, 'reservoir')
+  } else {
+    usePopup(1, props.map, pixel, attribute, refs, 'river')
+  }
 }
 //水库弹出框
 const reservoirPopup = () => {
@@ -139,8 +158,6 @@ const reservoirPopup = () => {
    * 为map添加点击事件监听，渲染弹出popup
    */
   props.map.on('click', function (evt: any) {
-    console.log('popup')
-
     //判断当前单击处是否有要素，捕获到要素时弹出popup.
     //forEachFeatureAtPixel用于在指定像素位置检索地图上的要素
     //该方法接受两个参数：
@@ -153,13 +170,6 @@ const reservoirPopup = () => {
       },
     )
     if (feature) {
-      if (!feature.getProperties().features) return
-      //得到feature的属性
-      const attribute = feature.getProperties().features[0].values_.attribute
-
-      if (attribute.type !== 'reservoir') return
-      const pLen = feature.getProperties().features.length
-      const pixel = props.map.getEventPixel(evt.originalEvent)
       const refs = {
         popupRef,
         popupContentRef,
@@ -172,9 +182,28 @@ const reservoirPopup = () => {
         address,
         popupVisible,
       }
-      usePopup(pLen, props.map, pixel, attribute, refs)
+      let attribute
+      //得到feature的属性
+      if (!feature.getProperties().features) {
+        console.log(feature.getProperties())
+        attribute = feature.getProperties().attribute
+      } else {
+        attribute = feature.getProperties().features[0].values_.attribute
+      }
+
+      if (attribute.type == 'reservoir') {
+        console.log('popup')
+        const pLen = feature.getProperties().features.length
+        const pixel = props.map.getEventPixel(evt.originalEvent)
+
+        usePopup(pLen, props.map, pixel, attribute, refs, 'reservoir')
+      } else if (attribute.type == 'river') {
+        const pLen = 1
+        const pixel = props.map.getEventPixel(evt.originalEvent)
+        usePopup(pLen, props.map, pixel, attribute, refs, 'river')
+      }
     } else {
-      // overlay.setPosition(undefined)
+      // 当前点击位置没有要素
       return false
     }
   })
@@ -192,27 +221,24 @@ const reservoirPopup = () => {
 const checkChange = (valList: CheckboxValueType[]) => {
   if (valList.includes('实时水情')) {
     props.map.addLayer(waterStore.reservoir)
+    props.map.addLayer(waterStore.river)
+    //添加图例
     legendStore.addLegend({
       title: '水库',
-      style: new Style({
-        image: new RegularShape({
-          fill: new Fill({
-            color: '#3399CC',
-          }),
-          stroke: new Stroke({
-            color: '#fff',
-          }),
-          points: 3, // 三角形的边数
-          radius: 10, // 三角形的半径
-          angle: 0, // 三角形的旋转角度
-        }),
-      }),
+      style: reservoirStyle,
+      geomType: 'point',
+    })
+    legendStore.addLegend({
+      title: '河流',
+      style: riverStyle,
       geomType: 'point',
     })
     $emit('legend')
   } else {
     props.map.removeLayer(waterStore.reservoir)
+    props.map.removeLayer(waterStore.river)
     legendStore.removeLegend('水库')
+    legendStore.removeLegend('河流')
     $emit('legend')
   }
 }
@@ -328,13 +354,13 @@ watch(
 onMounted(() => {
   console.log('mounted--')
   getAllReservoir()
-
+  getAllRiver()
   nextTick(() => {
     reservoirPopup()
   })
 })
 onBeforeUnmount(() => {
-  console.log('destory--')
+  console.log('Opration.vue,destory--')
 })
 </script>
 

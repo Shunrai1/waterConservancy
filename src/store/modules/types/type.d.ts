@@ -6,7 +6,7 @@ import { Style } from 'ol/style'
  */
 export type WaterState = {
   reservoir: Vector
-
+  river: Vector
   reservoirSign: Vector
   popup: Overlay | null
 }

@@ -28,6 +28,7 @@ export const usePopup = (
     address: Ref
     popupVisible: Ref<boolean>
   },
+  type: string,
 ) => {
   const {
     popupVisible,
@@ -47,6 +48,7 @@ export const usePopup = (
     //当前窗口可见
     autoPan: true,
     positioning: 'bottom-center',
+    offset: [0, 20],
   })
   /**
    * 添加关闭按钮的单击事件（隐藏popup）
@@ -66,19 +68,27 @@ export const usePopup = (
     // getEventPixel(evt.originalEvent) 是在地图点击事件中获取点击位置的像素坐标。
 
     map.forEachFeatureAtPixel(pixel, function () {
+      popupContentRef.value.innerHTML = ''
       //新增div元素
       const elementDiv = document.createElement('div')
       elementDiv.className = 'markerText'
       setInnerText(elementDiv, `${attribute.userName}`)
 
       const xAxisData = attribute.data.map((v: Reservoir) => v.tm).reverse()
-      const data = attribute.data.map((v: Reservoir) => v.rz).reverse()
+      let data = null
+      if (type == 'reservoir') {
+        data = attribute.data.map((v: Reservoir) => v.rz).reverse()
+        currentLevel.value = attribute.data[0].rz
+      } else if (type == 'river') {
+        data = attribute.data.map((v: Reservoir) => v.z).reverse()
+        currentLevel.value = attribute.data[0].z
+      }
+
       // let normal = attribute.data[0].otq
       // let danger = attribute.data[0].w
       // dangerLevel.value = attribute.data[0].w
       address.value = attribute.address
       time.value = attribute.data[0].tm
-      currentLevel.value = attribute.data[0].rz
       const myChart = echarts.init(chart.value)
 
       /** @type EChartsOption */
@@ -88,6 +98,20 @@ export const usePopup = (
           axisPointer: {
             type: 'shadow',
           },
+        },
+        toolbox: {
+          show: true,
+          feature: {
+            dataView: {
+              readOnly: false,
+            },
+            magicType: {
+              type: ['line', 'bar'],
+            },
+
+            saveAsImage: {},
+          },
+          left: '50%',
         },
         grid: {
           left: '10%',

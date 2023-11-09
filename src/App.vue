@@ -57,7 +57,7 @@
 <script setup lang="ts">
 import useLegendStore from '@/store/modules/legend'
 // import useWaterStore from '@/store/modules/water'
-import { nextTick, onMounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref } from 'vue'
 import Opration from './components/Opration.vue'
 //openlayers的API
 import { Feature, Map, View } from 'ol'
@@ -67,8 +67,6 @@ import { defaults, Zoom, ZoomToExtent } from 'ol/control'
 import VectorSource from 'ol/source/Vector'
 import GeoJSON from 'ol/format/GeoJSON'
 import VectorLayer from 'ol/layer/Vector'
-import Style, { StyleLike } from 'ol/style/Style'
-import Stroke from 'ol/style/Stroke'
 import { Projection, fromLonLat } from 'ol/proj'
 import { LineString, Point, Polygon } from 'ol/geom'
 
@@ -76,6 +74,8 @@ import Vector from 'ol/source/Vector'
 import { ImageStatic } from 'ol/source'
 import { Image } from 'ol/layer'
 import { getCenter } from 'ol/extent'
+import { guangxiStyle } from './utils/style'
+import { StyleLike } from 'ol/style/Style'
 
 const legendStore = useLegendStore()
 // const waterStore = useWaterStore()
@@ -94,13 +94,13 @@ const guanxiVector = ref<VectorLayer<any>>()
 //图例
 const getLegend = () => {
   const legendRows = legendStore.legendList
-  console.log(legendRows)
+
   // 遍历存储的图例行并构建所需的 HTML 元素，通常是“迷你 map ”的 div 和图层名称
   const tble = document.getElementById('table')
   tble!.innerHTML = ''
   for (let i = 0; i < legendRows.length; i++) {
-    console.log('add')
-    const row = document.createElement('tr')
+    const row: any = document.createElement('tr')
+    row.style = 'margin-bottom: 10px;'
     //symbol
     let cell: any = document.createElement('td')
     // cell.style = 'width:35px;height:35px'
@@ -255,25 +255,13 @@ const initMap = () => {
       title: '广西省',
     },
     source: source,
-    style: function () {
-      return new Style({
-        stroke: new Stroke({
-          color: 'red',
-          width: 5,
-        }),
-      })
-    },
+    style: guangxiStyle,
   })
   //添加图例到仓库
   legendStore.addLegend({
     title: '广西省',
     geomType: 'polygon',
-    style: new Style({
-      stroke: new Stroke({
-        color: 'red',
-        width: 5,
-      }),
-    }),
+    style: guangxiStyle,
   })
 
   //地图对象
@@ -312,13 +300,7 @@ const initMap = () => {
 //生命周期
 onMounted(() => {
   initMap()
-  map.value?.on('change:view', () => {
-    console.log('mapComplete')
-  })
-  map.value?.on('click', () => {
-    console.log('有用?')
-  })
-  invisibelVector()
+  invisibelGaode()
   nextTick(() => {
     getLegend()
   })
@@ -327,6 +309,9 @@ onMounted(() => {
 window.onresize = () => {
   mapRef.value.style.transform = `scale(${getScale()}) translate(-50%,-50%)`
 }
+onUnmounted(() => {
+  console.log('App.vue,destory')
+})
 </script>
 
 <style scoped lang="scss">

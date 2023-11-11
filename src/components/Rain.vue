@@ -6,6 +6,7 @@
       class="styleCheckbox"
       @change="checkChange"
       style="margin-top: 5px; margin-bottom: 10px"
+      :disabled="checkDisabled"
     >
       <el-checkbox label="1">
         <template v-slot>
@@ -56,13 +57,14 @@
         </template>
       </el-checkbox>
     </el-checkbox-group>
-    <el-radio-group v-model="radio">
+    <el-radio-group v-model="radio" @change="radioChange">
       <el-radio :label="3">雨量信息</el-radio>
       <el-radio :label="6">各市最大雨量</el-radio>
       <el-radio :label="9">量级统计</el-radio>
     </el-radio-group>
     <!-- 雨量信息表格 -->
     <el-table
+      v-if="radio != 9"
       :data="filterTableData"
       border
       style="width: 100%; margin-top: 2px; margin-bottom: 10px"
@@ -77,13 +79,21 @@
       <el-table-column prop="soilList[0].col002" label="时间" width="180" />
       <el-table-column prop="soilList[0].col007" label="雨量(mm)" width="180" />
     </el-table>
+    <!-- 量级统计 -->
+    <div
+      v-show="radio == 9"
+      ref="measureChart"
+      style="height: 350px; width: 410px"
+    ></div>
     <el-pagination
+      v-if="radio != 9"
       background
       v-model:page-size="pageSize"
       v-model:current-page="currentPage"
       :pager-count="5"
       layout="total,->,prev, pager, next"
       :total="total"
+      @current-change="currentChange"
     />
   </div>
 </template>
@@ -108,7 +118,11 @@ import { Projection, fromLonLat } from 'ol/proj'
 import { ImageStatic, Vector } from 'ol/source'
 import { Image } from 'ol/layer'
 import { computed, onMounted, ref } from 'vue'
+import { getCityMaxRainfallAPI } from '@/api/Rain'
+import * as echarts from 'echarts'
 
+const measureChart = ref()
+const checkDisabled = ref<boolean>(false)
 const pageSize = ref(7)
 const currentPage = ref(1)
 const radio = ref(3)
@@ -173,6 +187,18 @@ const MTFData: SitInfo[] = props.rainRes.filter((v) =>
     .filter((v) => v >= 250)
     .includes(v.soilList[0].col007),
 )
+//选出数据最多的一个数组
+const arrays: any = []
+arrays.push(lesTenData, tenToTFData, TFToFData, FToHData, HToTHF, MTFData)
+let longestIndex: any = 0
+let longestLength = arrays[0].length
+for (let i = 1; i < arrays.length; i++) {
+  if (arrays[i].length > longestLength) {
+    longestIndex = i
+    longestLength = arrays[i].length
+  }
+}
+const longestArray = arrays[longestIndex]
 //过滤数据
 const filterTableData = computed(() => {
   if (radio.value == 3) {
@@ -180,10 +206,85 @@ const filterTableData = computed(() => {
       (currentPage.value - 1) * pageSize.value,
       currentPage.value * pageSize.value,
     )
+  } else if (radio.value == 6) {
+    return tableData.value
   }
   return []
 })
 
+//单选框改变事件
+const radioChange = (val: string | number | boolean) => {
+  currentPage.value = 1
+  if (val == 6) {
+    getCityMaxRainfallData()
+    checkDisabled.value = true
+  } else if (val == 3) {
+    checkChange(checkList.value)
+    checkDisabled.value = false
+  } else {
+    checkDisabled.value = true
+    const myChart = echarts.init(measureChart.value)
+    /** @type EChartsOption */
+    const options = {
+      dataset: {
+        source: [
+          ['amount', 'product'],
+          [lesTenData.length, '小于10'],
+          [tenToTFData.length, '(10-25)'],
+          [TFToFData.length, '(25-50)'],
+          [FToHData.length, '(50-100)'],
+          [HToTHFData.length, '(100-250)'],
+          [MTFData.length, '250以上'],
+        ],
+      },
+      grid: {
+        left: '16%',
+        right: '16%',
+      },
+      xAxis: { name: '出现次数' },
+      yAxis: { type: 'category', name: '雨量范围' },
+      visualMap: {
+        orient: 'horizontal',
+        left: 'center',
+        min: 0,
+        max: longestArray.length,
+        // text: ['High Score', 'Low Score'],
+        // Map the score column to color
+        dimension: 0,
+        inRange: {
+          color: ['#65B581', '#FFCE34', '#FD665F'],
+        },
+      },
+      series: [
+        {
+          type: 'bar',
+          encode: {
+            // Map the "amount" column to X axis.
+            x: 'amount',
+            // Map the "product" column to Y axis
+            y: 'product',
+          },
+        },
+      ],
+    }
+    options && myChart.setOption(options)
+  }
+}
+//当前页面改变
+const currentChange = () => {
+  if (radio.value == 6) {
+    getCityMaxRainfallData()
+  }
+}
+//获取各市最大雨量数据
+const getCityMaxRainfallData = () => {
+  getCityMaxRainfallAPI(pageSize.value, currentPage.value).then((res) => {
+    if (res.code == 200) {
+      tableData.value = res.data.data
+      total.value = res.data.total
+    }
+  })
+}
 //表格行点击事件
 const rainRow = (row: SitInfo) => {
   const view = props.map.getView()
@@ -191,25 +292,14 @@ const rainRow = (row: SitInfo) => {
   view.setZoom(12)
   //地图移动事件结束后，执行回调函数
   props.map.once('moveend', () => {
-    if (radio.value == 3) {
-      const attr = {
-        userName: `${row.stname}-雨量图`,
-        address: `${row.city}${row.address}`,
-        data: row.soilList,
-        coordinate: fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]),
-        type: 'rain',
-      }
-      $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
-    } else {
-      const attr = {
-        userName: `${row.rivername}-水位图`,
-        address: `${row.city}${row.address}`,
-        data: row.riverrTM,
-        coordinate: fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]),
-        type: 'river',
-      }
-      $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
+    const attr = {
+      userName: `${row.stname}-雨量图`,
+      address: `${row.city}${row.address}`,
+      data: row.soilList,
+      coordinate: fromLonLat([parseFloat(row.lon), parseFloat(row.lat)]),
+      type: 'rain',
     }
+    $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
   })
 }
 //复选框样式
@@ -284,7 +374,7 @@ const checkboxStyle = () => {
 }
 //雨量复选框变化
 const checkChange = (val: CheckboxValueType[]) => {
-  console.log(val)
+  tableData.value = []
   for (let i = 1; i < 7; i++) {
     let tempData: any
     if (i == 1) {

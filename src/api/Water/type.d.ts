@@ -71,7 +71,7 @@ export interface SitInfo {
 }
 
 /**
- * 获取水库数据响应类型
+ * 获取水库河流雨量数据响应类型
  */
 export interface ReservoirResponsData extends ResponsData {
   data: {

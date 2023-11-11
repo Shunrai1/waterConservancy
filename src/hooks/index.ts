@@ -1,4 +1,4 @@
-import { Reservoir } from '@/api/Water/type'
+import { Rain, Reservoir, River } from '@/api/Water/type'
 import { Map, Overlay } from 'ol'
 import { Pixel } from 'ol/pixel'
 import { Ref } from 'vue'
@@ -21,7 +21,9 @@ export const usePopup = (
     popupContentRef: Ref<any>
     popupCloserRef: Ref<any>
     chart: Ref<any>
+    rainChart: Ref<any>
     waterVisible: Ref<boolean> //控制实时水情的popup内容区
+    rainVisible: Ref<boolean>
     dangerLevel: Ref<number> //危险水位
     currentLevel: Ref<number> //目前水位
     time: Ref
@@ -33,15 +35,21 @@ export const usePopup = (
   const {
     popupVisible,
     waterVisible,
+    rainVisible,
     address,
     time,
     currentLevel,
     chart,
+    rainChart,
     popupContentRef,
     popupRef,
     popupCloserRef,
   } = refs
   popupVisible.value = true
+  //清除已有echart实例
+  // myChart.value?.dispose()
+
+  // let myChart: any
   //新建覆盖物
   const overlay = new Overlay({
     element: popupRef.value,
@@ -61,12 +69,166 @@ export const usePopup = (
     popupCloserRef.value.blur()
     return false
   }
-  if (pLen === 1) {
+  //实时水情
+  if (type == 'reservoir' || type == 'river') {
+    if (pLen === 1) {
+      popupContentRef.value.innerHTML = ''
+      waterVisible.value = true
+      rainVisible.value = false
+      // getEventPixel(evt.originalEvent) 是在地图点击事件中获取点击位置的像素坐标。
+
+      map.forEachFeatureAtPixel(pixel, function () {
+        popupContentRef.value.innerHTML = ''
+        //新增div元素
+        const elementDiv = document.createElement('div')
+        elementDiv.className = 'markerText'
+        setInnerText(elementDiv, `${attribute.userName}`)
+
+        let xAxisData
+        let data = null
+        if (type == 'reservoir') {
+          data = attribute.data.map((v: Reservoir) => v.rz).reverse()
+          currentLevel.value = attribute.data[0].rz
+          xAxisData = attribute.data.map((v: Reservoir) => v.tm).reverse()
+        } else if (type == 'river') {
+          data = attribute.data.map((v: River) => v.z).reverse()
+          currentLevel.value = attribute.data[0].z
+          xAxisData = attribute.data.map((v: River) => v.tm).reverse()
+        }
+
+        // let normal = attribute.data[0].otq
+        // let danger = attribute.data[0].w
+        // dangerLevel.value = attribute.data[0].w
+        address.value = attribute.address
+        time.value = attribute.data[0].tm
+        // myChart?.dispose()
+        const myChart = echarts.init(chart.value)
+
+        /** @type EChartsOption */
+        const option = {
+          tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+              type: 'shadow',
+            },
+          },
+          toolbox: {
+            show: true,
+            feature: {
+              dataView: {
+                readOnly: false,
+              },
+              magicType: {
+                type: ['line', 'bar'],
+              },
+
+              saveAsImage: {},
+            },
+            left: '50%',
+          },
+          grid: {
+            left: '10%',
+            bottom: '20%',
+          },
+          xAxis: {
+            type: 'category',
+            data: xAxisData,
+          },
+          yAxis: {
+            max: 150,
+            type: 'value',
+            name: '水位/m',
+          },
+          series: [
+            {
+              name: '水位',
+              data: data,
+              type: 'bar',
+              markLine: {
+                label: {
+                  formatter: '{b}',
+                  position: 'insideEndTop',
+                },
+                data: [
+                  {
+                    name: '警戒水位',
+                    yAxis: 120,
+                    lineStyle: {
+                      color: 'red',
+                      type: 'dashed',
+                    },
+                    emphasis: {
+                      lineStyle: {
+                        color: 'rgba(122, 24, 192, 1)',
+                      },
+                      label: {
+                        // 添加标题的显示内容和样式
+                        show: true,
+                        formatter: '120/m', // 标题的显示内容
+                        textStyle: {
+                          // 标题的样式
+                          color: 'rgba(122, 24, 192, 1)',
+                        },
+                      },
+                    },
+                  },
+                  {
+                    name: '正常水位',
+                    yAxis: 80,
+                    lineStyle: {
+                      color: 'rgb(39, 174, 50)',
+                      type: 'dashed',
+                    },
+                    emphasis: {
+                      lineStyle: {
+                        color: 'rgba(122, 24, 192, 1)',
+                      },
+                      label: {
+                        // 添加标题的显示内容和样式
+                        show: true,
+                        formatter: '80/m', // 标题的显示内容
+                        textStyle: {
+                          // 标题的样式
+                          color: 'rgba(122, 24, 192, 1)',
+                        },
+                      },
+                    },
+                  },
+                ],
+
+                // silent: true,
+              },
+            },
+          ],
+        }
+
+        option && myChart.setOption(option)
+        // 为content添加div子节点
+        popupContentRef.value.appendChild(elementDiv)
+        overlay.setPosition(attribute.coordinate)
+        map.addOverlay(overlay)
+      })
+    } else {
+      popupContentRef.value.innerHTML = ''
+      waterVisible.value = false
+      //新增div元素
+      const elementDiv = document.createElement('div')
+      elementDiv.className = 'markerText'
+      map.forEachFeatureAtPixel(pixel, function () {
+        setInnerText(elementDiv, `水库聚合个数: ${pLen}。 请放大`)
+        // 为content添加div子节点
+        popupContentRef.value.appendChild(elementDiv)
+
+        overlay.setPosition(attribute.coordinate)
+        map.addOverlay(overlay)
+      })
+    }
+  }
+  //实时雨情
+  if (type == 'rain') {
     popupContentRef.value.innerHTML = ''
-    waterVisible.value = true
-
-    // getEventPixel(evt.originalEvent) 是在地图点击事件中获取点击位置的像素坐标。
-
+    waterVisible.value = false
+    rainVisible.value = true
     map.forEachFeatureAtPixel(pixel, function () {
       popupContentRef.value.innerHTML = ''
       //新增div元素
@@ -74,22 +236,17 @@ export const usePopup = (
       elementDiv.className = 'markerText'
       setInnerText(elementDiv, `${attribute.userName}`)
 
-      const xAxisData = attribute.data.map((v: Reservoir) => v.tm).reverse()
-      let data = null
-      if (type == 'reservoir') {
-        data = attribute.data.map((v: Reservoir) => v.rz).reverse()
-        currentLevel.value = attribute.data[0].rz
-      } else if (type == 'river') {
-        data = attribute.data.map((v: Reservoir) => v.z).reverse()
-        currentLevel.value = attribute.data[0].z
-      }
+      const data = attribute.data.map((v: Rain) => v.col007).reverse()
+      currentLevel.value = attribute.data[0].col007
+      const xAxisData = attribute.data.map((v: Rain) => v.col002).reverse()
 
       // let normal = attribute.data[0].otq
       // let danger = attribute.data[0].w
       // dangerLevel.value = attribute.data[0].w
       address.value = attribute.address
-      time.value = attribute.data[0].tm
-      const myChart = echarts.init(chart.value)
+      time.value = attribute.data[0].col002
+      // myChart?.dispose()
+      const myChart = echarts.init(rainChart.value)
 
       /** @type EChartsOption */
       const option = {
@@ -122,68 +279,23 @@ export const usePopup = (
           data: xAxisData,
         },
         yAxis: {
-          max: 150,
+          max: 300,
           type: 'value',
-          name: '水位/m',
+          name: '雨量/mm',
         },
         series: [
           {
-            name: '水位',
+            name: '雨量',
             data: data,
             type: 'bar',
-            markLine: {
-              label: {
-                formatter: '{b}',
-                position: 'insideEndTop',
-              },
+            markPoint: {
               data: [
-                {
-                  name: '警戒水位',
-                  yAxis: 120,
-                  lineStyle: {
-                    color: 'red',
-                    type: 'dashed',
-                  },
-                  emphasis: {
-                    lineStyle: {
-                      color: 'rgba(122, 24, 192, 1)',
-                    },
-                    label: {
-                      // 添加标题的显示内容和样式
-                      show: true,
-                      formatter: '120/m', // 标题的显示内容
-                      textStyle: {
-                        // 标题的样式
-                        color: 'rgba(122, 24, 192, 1)',
-                      },
-                    },
-                  },
-                },
-                {
-                  name: '正常水位',
-                  yAxis: 80,
-                  lineStyle: {
-                    color: 'rgb(39, 174, 50)',
-                    type: 'dashed',
-                  },
-                  emphasis: {
-                    lineStyle: {
-                      color: 'rgba(122, 24, 192, 1)',
-                    },
-                    label: {
-                      // 添加标题的显示内容和样式
-                      show: true,
-                      formatter: '80/m', // 标题的显示内容
-                      textStyle: {
-                        // 标题的样式
-                        color: 'rgba(122, 24, 192, 1)',
-                      },
-                    },
-                  },
-                },
+                { type: 'max', name: 'Max' },
+                { type: 'min', name: 'Min' },
               ],
-
-              // silent: true,
+            },
+            markLine: {
+              data: [{ type: 'average', name: 'Avg' }],
             },
           },
         ],
@@ -193,20 +305,6 @@ export const usePopup = (
 
       // 为content添加div子节点
       popupContentRef.value.appendChild(elementDiv)
-      overlay.setPosition(attribute.coordinate)
-      map.addOverlay(overlay)
-    })
-  } else {
-    popupContentRef.value.innerHTML = ''
-    waterVisible.value = false
-    //新增div元素
-    const elementDiv = document.createElement('div')
-    elementDiv.className = 'markerText'
-    map.forEachFeatureAtPixel(pixel, function () {
-      setInnerText(elementDiv, `水库聚合个数: ${pLen}。 请放大`)
-      // 为content添加div子节点
-      popupContentRef.value.appendChild(elementDiv)
-
       overlay.setPosition(attribute.coordinate)
       map.addOverlay(overlay)
     })

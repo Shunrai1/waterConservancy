@@ -37,7 +37,22 @@ export type ReservoirList = Reservoir[]
 export type RiverList = River[]
 
 /**
- * 站点水库河流信息
+ * 雨量信息
+ */
+export type Rain = {
+  id: number
+  col001: string
+  col002: string
+  col007: number
+}
+
+/**
+ * 雨量信息列表
+ */
+export type RainList = Rain[]
+
+/**
+ * 站点水库河流雨量信息
  */
 export interface SitInfo {
   stcd: string
@@ -52,6 +67,7 @@ export interface SitInfo {
   address: string
   rsvrrTM: ReservoirList
   riverrTM: RiverList
+  soilList: RainList
 }
 
 /**

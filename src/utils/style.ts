@@ -33,3 +33,87 @@ export const guangxiStyle = new Style({
     width: 5,
   }),
 })
+export const rainLessTenStyle = new Style({
+  //形状
+  image: new RegularShape({
+    fill: new Fill({
+      color: 'rgb(211, 213, 71)',
+    }),
+    stroke: new Stroke({
+      color: 'black',
+      width: 1,
+    }),
+    radius: 5,
+    points: 50, // 设置点数越多，圆形越平滑
+  }),
+})
+export const rainTenToTwentyFiveStyle = new Style({
+  //形状
+  image: new RegularShape({
+    fill: new Fill({
+      color: 'rgb(211, 213, 71)',
+    }),
+    stroke: new Stroke({
+      color: 'black',
+      width: 1,
+    }),
+    radius: 7,
+    points: 50, // 设置点数越多，圆形越平滑
+  }),
+})
+export const rainTwentyFiveToFiftyStyle = new Style({
+  //形状
+  image: new RegularShape({
+    fill: new Fill({
+      color: 'rgb(211, 213, 71)',
+    }),
+    stroke: new Stroke({
+      color: 'black',
+      width: 1,
+    }),
+    radius: 9,
+    points: 50, // 设置点数越多，圆形越平滑
+  }),
+})
+export const rainFiveToHundredStyle = new Style({
+  //形状
+  image: new RegularShape({
+    fill: new Fill({
+      color: 'rgb(211, 213, 71)',
+    }),
+    stroke: new Stroke({
+      color: 'black',
+      width: 1,
+    }),
+    radius: 11,
+    points: 50, // 设置点数越多，圆形越平滑
+  }),
+})
+export const rainHundredToTowHundredAndFiftyStyle = new Style({
+  //形状
+  image: new RegularShape({
+    fill: new Fill({
+      color: 'rgb(211, 213, 71)',
+    }),
+    stroke: new Stroke({
+      color: 'black',
+      width: 1,
+    }),
+    radius: 13,
+    points: 50, // 设置点数越多，圆形越平滑
+  }),
+})
+export const rainMoreTowHundredAndFiftyStyle = new Style({
+  //形状
+  image: new RegularShape({
+    fill: new Fill({
+      color: 'rgb(211, 213, 71)',
+    }),
+    stroke: new Stroke({
+      color: 'black',
+      width: 1,
+    }),
+    radius: 15,
+    points: 50, // 设置点数越多，圆形越平滑
+  }),
+})

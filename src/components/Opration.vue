@@ -1,8 +1,12 @@
 <template>
   <div class="opration">
-    <el-checkbox-group v-model="checkList" @change="checkChange">
-      <el-checkbox label="实时水情" />
-      <el-checkbox label="实时雨情" />
+    <el-checkbox-group
+      class="checkbox"
+      v-model="checkList"
+      @change="checkChange"
+    >
+      <el-checkbox label="实时水情" @change="waterCheck" />
+      <el-checkbox label="实时雨情" @change="rainCheck" />
       <el-checkbox label="台风路径" />
       <el-checkbox label="卫星云层" />
       <el-button
@@ -30,11 +34,19 @@
         >
           <template v-slot>
             <Water
+              v-if="editableTabsValue == '1'"
               :dataRes="dataRes"
               :map="map"
-              @auto="autoReservoirPopup"
+              @auto="autoPopup"
               :riverRes="riverRes"
             />
+            <Rain
+              v-show="editableTabsValue == '2'"
+              :rainRes="rainRes"
+              :rainTotal="rainTotal"
+              @auto="autoPopup"
+              :map="map"
+            ></Rain>
           </template>
         </el-tab-pane>
       </el-tabs>
@@ -70,6 +82,22 @@
         </el-form-item>
       </el-form>
     </div>
+    <div v-show="rainVisible">
+      <div ref="rainChart" id="chart" style="width: 300px; height: 200px"></div>
+      <el-form label-width="70px" class="form">
+        <el-form-item label="最新雨量">
+          <el-tag type="info" style="margin-right: 10px">
+            {{ currentLevel }}/mm
+          </el-tag>
+        </el-form-item>
+        <el-form-item label="时&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;间">
+          {{ time }}
+        </el-form-item>
+        <el-form-item label="地&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;址">
+          {{ address }}
+        </el-form-item>
+      </el-form>
+    </div>
   </div>
 </template>
 
@@ -79,6 +107,7 @@ import { List } from '@element-plus/icons-vue'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { CheckboxValueType, TabPaneName } from 'element-plus'
 import Water from './Water.vue'
+import Rain from './Rain.vue'
 import { SitInfo } from '@/api/Water/type'
 import { getAllAPI, getRiverAllAPI } from '@/api/Water'
 import { usePopup } from '@/hooks/index'
@@ -87,6 +116,7 @@ import { Map } from 'ol'
 import useLegendStore from '@/store/modules/legend'
 
 import { reservoirStyle, riverStyle } from '@/utils/style'
+import { getAllRainAPI } from '@/api/Rain'
 
 const legendStore = useLegendStore()
 const $emit = defineEmits(['legend'])
@@ -104,6 +134,9 @@ const editableTabsValue = ref('1') //默认选中的tab
 const resetBtn = ref()
 let dataRes: SitInfo[] = reactive([])
 let riverRes: SitInfo[] = reactive([])
+let rainRes: SitInfo[] = reactive([])
+const waterisChecked = ref(false)
+const rainisChecked = ref(false)
 // 实现popup的html元素
 const popupVisible = ref<boolean>(false)
 const popupRef = ref()
@@ -111,11 +144,35 @@ const popupContentRef = ref()
 const popupCloserRef = ref()
 const chart = ref()
 const waterVisible = ref<boolean>(false) //控制实时水情的popup内容区是否展示
+const rainVisible = ref<boolean>(false) ////控制实时雨情的popup内容区是否展示
 const dangerLevel = ref<number>(120) //危险水位
 const currentLevel = ref<number>(100) //目前水位
 const time = ref()
 const address = ref()
+const rainTotal = ref()
+const rainChart = ref()
+const reservoirAndRiverVisble = ref<boolean>(false)
+// let rainVisible = ref<boolean>(false)
 
+//实时水情多选框改变
+const waterCheck = (val: any) => {
+  waterisChecked.value = val
+  editableTabsValue.value = '1'
+}
+//实时雨情多选框改变
+const rainCheck = (val: any) => {
+  rainisChecked.value = val
+  editableTabsValue.value = '2'
+}
+//获取所有雨量数据
+const getAllRain = () => {
+  getAllRainAPI().then((res) => {
+    if (res.code == 200) {
+      rainRes = res.data.data
+      rainTotal.value = res.data.total
+    }
+  })
+}
 //获取所有河流信息
 const getAllRiver = () => {
   getRiverAllAPI().then((res) => {
@@ -132,14 +189,16 @@ const getAllReservoir = () => {
     }
   })
 }
-//点击table自动弹出水库popup
-const autoReservoirPopup = (pixel: Pixel, attribute: any) => {
+//点击table自动弹出popup
+const autoPopup = (pixel: Pixel, attribute: any) => {
   const refs = {
     popupRef,
     popupContentRef,
     popupCloserRef,
     chart,
+    rainChart,
     waterVisible,
+    rainVisible,
     dangerLevel,
     currentLevel,
     time,
@@ -148,11 +207,13 @@ const autoReservoirPopup = (pixel: Pixel, attribute: any) => {
   }
   if (attribute.type == 'reservoir') {
     usePopup(1, props.map, pixel, attribute, refs, 'reservoir')
-  } else {
+  } else if (attribute.type == 'river') {
     usePopup(1, props.map, pixel, attribute, refs, 'river')
+  } else if (attribute.type == 'rain') {
+    usePopup(1, props.map, pixel, attribute, refs, 'rain')
   }
 }
-//水库弹出框
+//地图弹出框
 const reservoirPopup = () => {
   /**
    * 为map添加点击事件监听，渲染弹出popup
@@ -175,13 +236,16 @@ const reservoirPopup = () => {
         popupContentRef,
         popupCloserRef,
         chart,
+        rainChart,
         waterVisible,
+        rainVisible,
         dangerLevel,
         currentLevel,
         time,
         address,
         popupVisible,
       }
+      const pixel = props.map.getEventPixel(evt.originalEvent)
       let attribute
       //得到feature的属性
       if (!feature.getProperties().features) {
@@ -194,13 +258,19 @@ const reservoirPopup = () => {
       if (attribute.type == 'reservoir') {
         console.log('popup')
         const pLen = feature.getProperties().features.length
-        const pixel = props.map.getEventPixel(evt.originalEvent)
-
+        reservoirAndRiverVisble.value = true
+        rainVisible.value = false
         usePopup(pLen, props.map, pixel, attribute, refs, 'reservoir')
       } else if (attribute.type == 'river') {
+        reservoirAndRiverVisble.value = true
+        rainVisible.value = false
         const pLen = 1
-        const pixel = props.map.getEventPixel(evt.originalEvent)
         usePopup(pLen, props.map, pixel, attribute, refs, 'river')
+      } else if (attribute.type == 'rain') {
+        reservoirAndRiverVisble.value = false
+        rainVisible.value = true
+        const pLen = 1
+        usePopup(pLen, props.map, pixel, attribute, refs, 'rain')
       }
     } else {
       // 当前点击位置没有要素
@@ -219,26 +289,73 @@ const reservoirPopup = () => {
 
 //复选框变化,添加或删除图层
 const checkChange = (valList: CheckboxValueType[]) => {
+  console.log(valList)
+  //实时水情
   if (valList.includes('实时水情')) {
-    props.map.addLayer(waterStore.reservoir)
-    props.map.addLayer(waterStore.river)
-    //添加图例
-    legendStore.addLegend({
-      title: '水库',
-      style: reservoirStyle,
-      geomType: 'point',
-    })
-    legendStore.addLegend({
-      title: '河流',
-      style: riverStyle,
-      geomType: 'point',
-    })
+    let rsirFlag = false
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (
+        arr[i].getProperties().title ==
+        waterStore.reservoir.getProperties().title
+      ) {
+        rsirFlag = true
+      }
+    }
+    if (!rsirFlag) {
+      props.map.addLayer(waterStore.reservoir)
+      //添加图例
+      legendStore.addLegend({
+        title: '水库',
+        style: reservoirStyle,
+        geomType: 'point',
+      })
+      props.map.addLayer(waterStore.river)
+
+      legendStore.addLegend({
+        title: '河流',
+        style: riverStyle,
+        geomType: 'point',
+      })
+    }
     $emit('legend')
   } else {
-    props.map.removeLayer(waterStore.reservoir)
-    props.map.removeLayer(waterStore.river)
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (
+        arr[i].getProperties().title == '水库' ||
+        arr[i].getProperties().title == '河流'
+      ) {
+        props.map.removeLayer(arr[i])
+      }
+    }
     legendStore.removeLegend('水库')
     legendStore.removeLegend('河流')
+    $emit('legend')
+  }
+
+  //实时雨情
+  if (valList.includes('实时雨情')) {
+    let rsirFlag = false
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (
+        arr[i].getProperties().title == waterStore.rain?.getProperties().title
+      ) {
+        rsirFlag = true
+      }
+    }
+    if (!rsirFlag) {
+      props.map.addLayer(waterStore.rain)
+    }
+    $emit('legend')
+  } else {
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].getProperties().title == '雨量') {
+        props.map.removeLayer(arr[i])
+      }
+    }
     $emit('legend')
   }
 }
@@ -355,6 +472,7 @@ onMounted(() => {
   console.log('mounted--')
   getAllReservoir()
   getAllRiver()
+  getAllRain()
   nextTick(() => {
     reservoirPopup()
   })
@@ -371,7 +489,7 @@ onBeforeUnmount(() => {
   right: 2%;
   z-index: 4;
   width: 480px;
-  :deep(.el-checkbox-group) {
+  .checkbox {
     background-color: rgba(135, 207, 235, 0.21);
     display: flex;
     justify-content: center;

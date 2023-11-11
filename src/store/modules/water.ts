@@ -7,6 +7,7 @@ import { Overlay } from 'ol'
 const useWaterStore = defineStore('Water', {
   state: (): WaterState => {
     return {
+      rain: null,
       river: null,
       reservoir: null,
       reservoirSign: null,
@@ -14,6 +15,13 @@ const useWaterStore = defineStore('Water', {
     }
   },
   actions: {
+    /**
+     * 存储雨量图层数据
+     * @param rainLayer
+     */
+    setRainLayer(rainLayer: Vector<any>) {
+      this.rain = rainLayer
+    },
     /**
      * 存储河流图层数据
      * @param riverLayer

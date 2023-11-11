@@ -32,9 +32,25 @@
     <!-- 图例 -->
     <el-card class="legend">
       <template #header>
+        <div
+          style="
+            background-color: aqua;
+            width: 5px;
+            height: 24px;
+            margin-right: 4px;
+          "
+        ></div>
         <div class="card-header">
           <span>图例</span>
         </div>
+        <div
+          style="
+            background-color: aquamarine;
+            width: 20px;
+            height: 5px;
+            margin-left: 140px;
+          "
+        ></div>
       </template>
       <table class="table" id="table">
         <!-- <tr>
@@ -402,6 +418,15 @@ onUnmounted(() => {
     width: 225px;
     background-color: rgb(66, 62, 62);
     color: white;
+
+    :deep(.el-card__header) {
+      padding-left: 8px;
+      padding-right: 8px;
+      height: 26px;
+      display: flex;
+      align-items: center;
+    }
+
     .table {
       display: flex;
       flex-wrap: wrap;

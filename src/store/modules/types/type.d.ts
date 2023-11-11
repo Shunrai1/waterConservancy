@@ -5,6 +5,7 @@ import { Style } from 'ol/style'
  * 水库state
  */
 export type WaterState = {
+  rain: Vector
   reservoir: Vector
   river: Vector
   reservoirSign: Vector

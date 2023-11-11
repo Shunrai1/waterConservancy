@@ -83,26 +83,6 @@
       width="180"
     />
   </el-table>
-  <!-- 河流表 -->
-  <!-- <el-table
-    ref="tableRef"
-    :data="riverData"
-    border
-    style="width: 100%; margin: 10px 0"
-    @row-click="reservoirRow"
-    highlight-current-row
-  >
-    <el-table-column type="index" label="序列" width="60"></el-table-column>
-    <el-table-column prop="stname" label="站名" width="150" />
-    <el-table-column prop="city" label="所属地市" width="150" />
-    <el-table-column prop="substation" label="所属分局" width="180" />
-    <el-table-column prop="address" label="具体位置" width="180" />
-    <el-table-column prop="rsvrrTM[0].tm" label="时间" width="180" />
-    <el-table-column prop="rsvrrTM[0].rz" label="水位/m" width="180" />
-    <el-table-column prop="rsvrrTM[0].inq" label="流量(m3/s)" width="180" />
-    <el-table-column prop="rsvrrTM[0].otq" label="正常水位/m" width="180" />
-    <el-table-column prop="rsvrrTM[0].w" label="警戒水位/m" width="180" />
-  </el-table> -->
   <el-pagination
     background
     v-model:page-size="pageSize"

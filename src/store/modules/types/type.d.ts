@@ -22,3 +22,9 @@ export type legendType = {
 export type legendState = {
   legendList: legendType[]
 }
+/**
+ * 台风state
+ */
+export type windType = {
+  wind: Vector
+}

@@ -48,7 +48,7 @@
             background-color: aquamarine;
             width: 20px;
             height: 5px;
-            margin-left: 140px;
+            margin-left: 170px;
           "
         ></div>
       </template>
@@ -73,7 +73,7 @@
 <script setup lang="ts">
 import useLegendStore from '@/store/modules/legend'
 // import useWaterStore from '@/store/modules/water'
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, provide, ref } from 'vue'
 import Opration from './components/Opration.vue'
 //openlayers的API
 import { Feature, Map, View } from 'ol'
@@ -313,7 +313,8 @@ const initMap = () => {
   )
 }
 
-//生命周期
+//生命周期等
+provide('getLegend', getLegend)
 onMounted(() => {
   initMap()
   invisibelGaode()
@@ -411,11 +412,11 @@ onUnmounted(() => {
   }
   .legend {
     position: absolute;
-    top: 77%;
+    top: 72%;
     left: 5%;
     z-index: 4;
-    height: 225px;
-    width: 225px;
+    height: 300px;
+    width: 250px;
     background-color: rgb(66, 62, 62);
     color: white;
 

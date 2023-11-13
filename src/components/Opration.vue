@@ -7,7 +7,7 @@
     >
       <el-checkbox label="实时水情" @change="waterCheck" />
       <el-checkbox label="实时雨情" @change="rainCheck" />
-      <el-checkbox label="台风路径" />
+      <el-checkbox label="台风路径" @change="windCheck" />
       <el-checkbox label="卫星云层" />
       <el-button
         @click="handle"
@@ -47,6 +47,7 @@
               @auto="autoPopup"
               :map="map"
             ></Rain>
+            <Wind v-show="editableTabsValue == '3'" :map="map"></Wind>
           </template>
         </el-tab-pane>
       </el-tabs>
@@ -102,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import Wind from './Wind.vue'
 import useWaterStore from '@/store/modules/water'
 import { List } from '@element-plus/icons-vue'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
@@ -114,7 +116,6 @@ import { usePopup } from '@/hooks/index'
 import { Pixel } from 'ol/pixel'
 import { Map } from 'ol'
 import useLegendStore from '@/store/modules/legend'
-
 import { reservoirStyle, riverStyle } from '@/utils/style'
 import { getAllRainAPI } from '@/api/Rain'
 
@@ -137,6 +138,7 @@ let riverRes: SitInfo[] = reactive([])
 let rainRes: SitInfo[] = reactive([])
 const waterisChecked = ref(false)
 const rainisChecked = ref(false)
+const windChecked = ref(false)
 // 实现popup的html元素
 const popupVisible = ref<boolean>(false)
 const popupRef = ref()
@@ -154,6 +156,11 @@ const rainChart = ref()
 const reservoirAndRiverVisble = ref<boolean>(false)
 // let rainVisible = ref<boolean>(false)
 
+//台风路径多选框改变
+const windCheck = (val: any) => {
+  editableTabsValue.value = '3'
+  windChecked.value = val
+}
 //实时水情多选框改变
 const waterCheck = (val: any) => {
   waterisChecked.value = val
@@ -289,7 +296,6 @@ const reservoirPopup = () => {
 
 //复选框变化,添加或删除图层
 const checkChange = (valList: CheckboxValueType[]) => {
-  console.log(valList)
   //实时水情
   if (valList.includes('实时水情')) {
     let rsirFlag = false
@@ -357,6 +363,15 @@ const checkChange = (valList: CheckboxValueType[]) => {
       }
     }
     $emit('legend')
+  }
+  if (!valList.includes('台风路径')) {
+    console.log('taifenlujjin1')
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].getProperties().title == '台风') {
+        props.map.removeLayer(arr[i])
+      }
+    }
   }
 }
 //list的icon点击事件

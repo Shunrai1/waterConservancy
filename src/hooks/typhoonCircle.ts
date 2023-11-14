@@ -3,7 +3,7 @@ import { Polygon } from 'ol/geom'
 import VectorLayer from 'ol/layer/Vector'
 import { fromLonLat } from 'ol/proj'
 import { Vector } from 'ol/source'
-import { Circle, Fill, Stroke, Style } from 'ol/style'
+import { typhoonCircle10, typhoonCircle7 } from '@/utils/style.ts'
 
 /**
  * @description 设置风圈
@@ -61,22 +61,7 @@ const useSetWindCircle = function (node: any) {
   const rainLayer = new VectorLayer({
     zIndex: 88,
     source: source,
-    style: new Style({
-      //填充色
-      fill: new Fill({
-        color: 'rgba(172, 158, 107, 0.56)',
-      }),
-      //边线颜色
-      stroke: new Stroke({
-        color: 'rgb(221, 207, 85)',
-        width: 2,
-      }),
-      //形状
-      image: new Circle({
-        radius: 5,
-        fill: new Fill({ color: 'red' }),
-      }),
-    }),
+    style: typhoonCircle7,
     properties: {
       title: 'typhoonCircle',
     },
@@ -129,22 +114,7 @@ const useSetWindCircle = function (node: any) {
     },
     zIndex: 88,
     source: source10,
-    style: new Style({
-      //填充色
-      fill: new Fill({
-        color: 'rgba(215, 81, 81, 0.43)',
-      }),
-      //边线颜色
-      stroke: new Stroke({
-        color: 'rgb(221, 207, 85)',
-        width: 2,
-      }),
-      //形状
-      image: new Circle({
-        radius: 5,
-        fill: new Fill({ color: 'red' }),
-      }),
-    }),
+    style: typhoonCircle10,
   })
   typhoonLayers.push(typhoon10)
   return typhoonLayers

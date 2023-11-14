@@ -345,7 +345,6 @@ const reservoirPopup = () => {
       let attribute
       //得到feature的属性
       if (!feature.getProperties().features) {
-        console.log(feature.getProperties())
         attribute = feature.getProperties().attribute
       } else {
         //聚合要素

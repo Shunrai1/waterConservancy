@@ -254,3 +254,41 @@ export const typhoonForecastRoute = new Style({
     lineDash: [5, 10], // 设置为虚线样式，[10, 5] 表示10个像素的实线和5个像素的空白
   }),
 })
+/**
+ * 台风风圈，10级
+ */
+export const typhoonCircle10 = new Style({
+  //填充色
+  fill: new Fill({
+    color: 'rgba(215, 81, 81, 0.43)',
+  }),
+  //边线颜色
+  stroke: new Stroke({
+    color: 'rgb(221, 207, 85)',
+    width: 2,
+  }),
+  //形状
+  image: new Circle({
+    radius: 5,
+    fill: new Fill({ color: 'red' }),
+  }),
+})
+/**
+ * 台风风圈，7级
+ */
+export const typhoonCircle7 = new Style({
+  //填充色
+  fill: new Fill({
+    color: 'rgba(172, 158, 107, 0.56)',
+  }),
+  //边线颜色
+  stroke: new Stroke({
+    color: 'rgb(221, 207, 85)',
+    width: 2,
+  }),
+  //形状
+  image: new Circle({
+    radius: 5,
+    fill: new Fill({ color: 'red' }),
+  }),
+})

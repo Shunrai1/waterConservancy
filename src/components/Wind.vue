@@ -6,6 +6,8 @@
       :data="tableData"
       style="width: 100%"
       @selection-change="handleSelectionChange"
+      @select="handleSelect"
+      @select-all="handleSelectAll"
     >
       <el-table-column type="selection" width="55" />
       <el-table-column
@@ -14,7 +16,22 @@
         width="120"
       ></el-table-column>
       <el-table-column property="windname" label="台风名" width="120" />
-      <el-table-column property="windeng" label="英文名" />
+      <el-table-column property="windeng" label="英文名">
+        <template v-slot="{ row }">
+          <div class="custom">
+            <span>{{ row.windeng }}</span>
+            <el-icon
+              v-if="row.isSelected && isSelected"
+              size="medium"
+              class="palyClass"
+              @click="playClick(row)"
+            >
+              <VideoPause color="red" v-if="row.isPlayed" />
+              <VideoPlay v-else />
+            </el-icon>
+          </div>
+        </template>
+      </el-table-column>
     </el-table>
     <div v-if="visible" style="margin-top: 10px">
       <div class="middle">&nbsp;&nbsp;{{ windName }}台风路径</div>
@@ -27,7 +44,7 @@
       >
         <el-table-column prop="tm" label="时间" width="180" />
         <el-table-column prop="windstrong" label="风力" width="180" />
-        <el-table-column prop="windspeed" label="风速" />
+        <el-table-column prop="windspeed" label="风速"></el-table-column>
       </el-table>
       <el-pagination
         background
@@ -42,6 +59,7 @@
 </template>
 
 <script setup lang="ts">
+import { VideoPlay, VideoPause } from '@element-plus/icons-vue'
 import {
   getBasicWindInfoAPI,
   getForecastWindInfoAPI,
@@ -49,7 +67,7 @@ import {
 } from '@/api/Wind/index'
 import { windInfo } from '@/api/Wind/type'
 import { Feature, Map } from 'ol'
-import { LineString, Point } from 'ol/geom'
+import { LineString, Point, Polygon } from 'ol/geom'
 import VectorLayer from 'ol/layer/Vector'
 import { Vector } from 'ol/source'
 import { computed, inject, onMounted, ref } from 'vue'
@@ -61,19 +79,23 @@ import {
   troDep,
   troSto,
   typhoon,
+  typhoonCircle10,
+  typhoonCircle7,
   typhoonForecastRoute,
   typhoonRoute,
   vilTyphoon,
 } from '@/utils/style'
 import useLegendStore from '@/store/modules/legend'
+import useSetWindCircle from '@/hooks/typhoonCircle'
 
+const isSelected = ref(true)
 const legendStore = useLegendStore()
 const windStore = useWindStore()
 const pageSize = ref(7)
 const currentPage = ref(1)
 const total = ref(0)
 const tableData = ref()
-const routeData = ref<windInfo[]>([])
+const routeData = ref<windInfo[]>([]) //后端传来的台风信息
 const visible = ref(false)
 const windName = ref()
 const $emit = defineEmits(['auto'])
@@ -83,9 +105,9 @@ const filterrouteData = computed(() => {
     currentPage.value * pageSize.value,
   )
 })
-const forecastData = ref()
-const windRouteList = ref<any>([])
-const windForecastRouteList = ref<any>([])
+const forecastData = ref() //后端传来的台风预测信息
+const windRouteList = ref<any>([]) //储存台风路径的数组,多条台风数据
+const windForecastRouteList = ref<any>([]) //存储台风预测路径的数组，多条台风预测数据
 const getLegend = inject('getLegend', () => {})
 const props = defineProps({
   map: {
@@ -94,6 +116,207 @@ const props = defineProps({
   },
 })
 
+//播放按钮点击事件
+const playClick = (row: any) => {
+  row.isPlayed = !row.isPlayed
+  //先移除之前存在的要素，图层
+  const features = windStore.wind.getSource().getFeatures()
+  for (let i = 0; i < features.length; i++) {
+    if (row.windid == features[i].get('attribute').windid) {
+      windStore.wind.getSource().removeFeature(features[i])
+      const arr = props.map.getAllLayers()
+      for (let i = 0; i < arr.length; i++) {
+        if (arr[i].getProperties().title == 'typhoonCircle') {
+          props.map.removeLayer(arr[i])
+        }
+      }
+    }
+  }
+  //筛选相关台风路径和台风预测路径
+  const windroute = JSON.parse(
+    JSON.stringify(
+      windRouteList.value.filter((v: any) => v[0].windid == row.windid)[0],
+    ),
+  ).reverse()
+  const windforecastroute = JSON.parse(
+    JSON.stringify(
+      windForecastRouteList.value.filter(
+        (v: any) => (v[0].windid = row.windid),
+      )[0],
+    ),
+  ).reverse()
+  const windforecastList = windforecastroute.map((v: any) => {
+    return fromLonLat([v.jindu, v.weidu])
+  })
+  //跳转定位
+  const view = props.map.getView()
+  view.setCenter(fromLonLat([windroute[0].jindu, windroute[0].weidu]))
+  view.setZoom(6.5)
+  //初始化台风实际
+  const pathFeature = new Feature({
+    geometry: new LineString([]),
+    attribute: { windid: windroute[0].windid },
+  })
+  pathFeature.setStyle(typhoonRoute)
+  //创建预测台风要素
+  const forecastPathFeature = new Feature({
+    geometry: new LineString(windforecastList),
+    attribute: { windid: windforecastroute[0].windid },
+  })
+  forecastPathFeature.setStyle(typhoonForecastRoute)
+  //预测点要素
+  const pointforecastFeature: any = []
+  for (let j = 0; j < windforecastList.length; j++) {
+    pointforecastFeature[j] = new Feature({
+      geometry: new Point(windforecastList[j]),
+      attribute: {
+        windid: windforecastroute[j].windid,
+        qiya: windforecastroute[j].qiya,
+        tm: windforecastroute[j].tm,
+        coordinate: [windforecastroute[j].jindu, windforecastroute[j].weidu],
+        type: windforecastroute[j].forecast
+          ? 'typhoonForecastPoint'
+          : 'typhoonPoint',
+        windstrong: windforecastroute[j].windstrong,
+        windspeed: windforecastroute[j].windspeed,
+        movespeed: windforecastroute[j].movespeed,
+        movedirect: windforecastroute[j].movedirect,
+        sevradius: windforecastroute[j].sevradius,
+        tenradius: windforecastroute[j].tenradius,
+        forecast: windforecastroute[j].forecast,
+      },
+    })
+    const qiya = windforecastroute[j].qiya
+    let style
+    if (qiya == '热带低压') {
+      style = troDep
+    } else if (qiya == '热带风暴') {
+      style = troSto
+    } else if (qiya == '强热带风暴') {
+      style = cycNar
+    } else if (qiya == '台风') {
+      style = typhoon
+    } else if (qiya == '强台风') {
+      style = vilTyphoon
+    } else {
+      style = supTyphoon
+    }
+    pointforecastFeature[j].setStyle(style)
+  }
+  //初始化风圈对象
+  const windWN10 = new Feature({ geometry: new Polygon([]) })
+  windWN10.setStyle(typhoonCircle10)
+  const windWN7 = new Feature({ geometry: new Polygon([]) })
+  windWN7.setStyle(typhoonCircle7)
+  //动态创建台风
+  let index = 0
+  const pointFeatrues: any = []
+  let source: any //源
+  //定时任务
+  const mytimer = setInterval(() => {
+    if (index >= windroute.length) {
+      clearInterval(mytimer)
+      row.isPlayed = false
+      source.addFeature(forecastPathFeature)
+      source.addFeatures(pointforecastFeature)
+      return
+    }
+    row.isPlayed = true
+    const node = windroute[index] //实际位置节点
+    const curPosition = fromLonLat([node.jindu, node.weidu])
+    let nextPostion: any = [] //下一个点
+    if (index < windroute.length - 1) {
+      const nextNode = windroute[index + 1]
+      nextPostion = fromLonLat([Number(nextNode.jindu), Number(nextNode.weidu)])
+    }
+    //创建风圈
+    const nodecircle = {
+      WD: node.weidu,
+      JD: node.jindu,
+      EN7Radii: node.tenradius,
+      ES7Radii: node.tenradius + 20,
+      WN7Radii: node.tenradius - 30,
+      WS7Radii: node.tenradius - 20,
+      EN10Radii: node.sevradius,
+      ES10Radii: node.sevradius + 20,
+      WN10Radii: node.sevradius - 30,
+      WS10Radii: node.sevradius - 20,
+    }
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].getProperties().title == 'typhoonCircle') {
+        props.map.removeLayer(arr[i])
+      }
+    }
+    const layers = useSetWindCircle(nodecircle)
+    layers?.forEach((v) => {
+      props.map.addLayer(v)
+    })
+    //创建实际路线
+    const realPathLine: any = pathFeature.getGeometry()
+    if (nextPostion.length) {
+      if (index == 0) {
+        realPathLine.setCoordinates([curPosition, nextPostion])
+      } else {
+        realPathLine.appendCoordinate(nextPostion)
+      }
+    }
+    //创建实际路线节点
+    const realNodeFeature = new Feature({
+      geometry: new Point(curPosition),
+      attribute: {
+        windid: node.windid,
+        qiya: node.qiya,
+        tm: node.tm,
+        coordinate: [node.jindu, node.weidu],
+        type: 'typhoonPoint',
+        windstrong: node.windstrong,
+        windspeed: node.windspeed,
+        movespeed: node.movespeed,
+        movedirect: node.movedirect,
+        sevradius: node.sevradius,
+        tenradius: node.tenradius,
+      },
+    })
+    const qiya = node.qiya
+    let style
+    if (qiya == '热带低压') {
+      style = troDep
+    } else if (qiya == '热带风暴') {
+      style = troSto
+    } else if (qiya == '强热带风暴') {
+      style = cycNar
+    } else if (qiya == '台风') {
+      style = typhoon
+    } else if (qiya == '强台风') {
+      style = vilTyphoon
+    } else {
+      style = supTyphoon
+    }
+    realNodeFeature.setStyle(style)
+    pointFeatrues.push(realNodeFeature)
+    if (!source) {
+      source = new Vector({
+        features: pointFeatrues.concat(pathFeature),
+      })
+    } else {
+      source.clear()
+      source.addFeatures(pointFeatrues.concat(pathFeature))
+    }
+    if (windStore.wind) {
+      windStore.wind.setSource(source)
+    } else {
+      windStore.wind = new VectorLayer({
+        properties: {
+          title: '台风',
+        },
+        source: source,
+        zIndex: 100,
+      })
+    }
+    index++
+  }, 300)
+}
 //台风行点击事件
 const typhoonRow = (row: any) => {
   const view = props.map.getView()
@@ -268,7 +491,6 @@ const initWindInfo = () => {
     zIndex: 100,
     source: source,
   })
-  // console.log('layer', layer.getSource()?.getFeatures())
   windStore.setWindLayer(layer)
 }
 //得到台风路径信息
@@ -309,9 +531,35 @@ const getWindInfo = async (windId: number) => {
   }
   initWindInfo()
 }
+//勾选全选行的触发事件
+const handleSelectAll = (selection: any) => {
+  if (selection.length <= 0) {
+    isSelected.value = false
+  } else {
+    isSelected.value = true
+    selection.forEach((row: any) => {
+      // console.log(row)
+      // if ('isSelected' in row) {
+      //   row.isSelected = !row.isSelected
+      // } else {
+      //   row.isSelected = true
+      // }
+      row.isSelected = true
+    })
+  }
+}
+//勾选数据行的触发事件
+const handleSelect = (_selection: any, row: any) => {
+  if ('isSelected' in row) {
+    row.isSelected = !row.isSelected
+  } else {
+    row.isSelected = true
+  }
+}
 //表格selection改变事件
 const handleSelectionChange = async (val: any) => {
   if (val.length > 0) {
+    isSelected.value = true
     // getLegend
     //添加图例
     legendStore.addLegend({
@@ -357,7 +605,10 @@ const handleSelectionChange = async (val: any) => {
           .map((v: any) => v.windid)
           .includes(features[i].get('attribute').windid)
       ) {
+        console.log('进来了')
+        //移除没有选择的要素
         windStore.wind.getSource().removeFeature(features[i])
+        //移除风圈
         const arr = props.map.getAllLayers()
         for (let i = 0; i < arr.length; i++) {
           if (arr[i].getProperties().title == 'typhoonCircle') {
@@ -375,6 +626,7 @@ const handleSelectionChange = async (val: any) => {
     }
     props.map.addLayer(windStore.wind)
   } else {
+    isSelected.value = false
     legendStore.removeLegend('热带低压')
     legendStore.removeLegend('热带风暴')
     legendStore.removeLegend('强热带风暴')
@@ -424,6 +676,16 @@ onMounted(() => {
     font-size: 16px;
     height: 25px;
     line-height: 25px;
+  }
+  .custom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    //播放按钮样式
+    .palyClass {
+      color: skyblue;
+      cursor: pointer;
+    }
   }
 }
 </style>

@@ -236,7 +236,7 @@ export const supTyphoon = new Style({
 /**
  * 台风路径
  */
-export const typhoonRole = new Style({
+export const typhoonRoute = new Style({
   //边线颜色
   stroke: new Stroke({
     color: 'rgb(99, 94, 100)',
@@ -246,7 +246,7 @@ export const typhoonRole = new Style({
 /**
  * 台风预测路径
  */
-export const typhoonForecastRole = new Style({
+export const typhoonForecastRoute = new Style({
   // 边线样式
   stroke: new Stroke({
     color: 'red',

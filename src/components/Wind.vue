@@ -18,7 +18,13 @@
     </el-table>
     <div v-if="visible" style="margin-top: 10px">
       <div class="middle">&nbsp;&nbsp;{{ windName }}台风路径</div>
-      <el-table :data="filterroleData" border style="width: 100%">
+      <el-table
+        :data="filterrouteData"
+        border
+        style="width: 100%"
+        @row-click="typhoonRow"
+        highlight-current-row
+      >
         <el-table-column prop="tm" label="时间" width="180" />
         <el-table-column prop="windstrong" label="风力" width="180" />
         <el-table-column prop="windspeed" label="风速" />
@@ -55,8 +61,8 @@ import {
   troDep,
   troSto,
   typhoon,
-  typhoonForecastRole,
-  typhoonRole,
+  typhoonForecastRoute,
+  typhoonRoute,
   vilTyphoon,
 } from '@/utils/style'
 import useLegendStore from '@/store/modules/legend'
@@ -67,18 +73,19 @@ const pageSize = ref(7)
 const currentPage = ref(1)
 const total = ref(0)
 const tableData = ref()
-const roleData = ref<windInfo[]>([])
+const routeData = ref<windInfo[]>([])
 const visible = ref(false)
 const windName = ref()
-const filterroleData = computed(() => {
-  return roleData.value.slice(
+const $emit = defineEmits(['auto'])
+const filterrouteData = computed(() => {
+  return routeData.value.slice(
     (currentPage.value - 1) * pageSize.value,
     currentPage.value * pageSize.value,
   )
 })
 const forecastData = ref()
-const windRoleList = ref<any>([])
-const windForecastRoleList = ref<any>([])
+const windRouteList = ref<any>([])
+const windForecastRouteList = ref<any>([])
 const getLegend = inject('getLegend', () => {})
 const props = defineProps({
   map: {
@@ -87,6 +94,29 @@ const props = defineProps({
   },
 })
 
+//台风行点击事件
+const typhoonRow = (row: any) => {
+  const view = props.map.getView()
+  view.setCenter(fromLonLat([row.jindu, row.weidu]))
+  view.setZoom(8)
+  //地图移动事件结束后，执行回调函数
+  props.map.once('moveend', () => {
+    const attr = {
+      coordinate: [parseFloat(row.jindu), parseFloat(row.weidu)],
+      windid: row.windid,
+      qiya: row.qiya,
+      tm: row.tm,
+      type: 'typhoonPoint',
+      windstrong: row.windstrong,
+      windspeed: row.windspeed,
+      movespeed: row.movespeed,
+      movedirect: row.movedirect,
+      sevradius: row.sevradius,
+      tenradius: row.tenradius,
+    }
+    $emit('auto', props.map.getPixelFromCoordinate(view.getCenter()!), attr)
+  })
+}
 //初始化台风图层
 const initWindInfo = () => {
   const lineList: any = [] //路径数组
@@ -97,8 +127,8 @@ const initWindInfo = () => {
   const foreLineFeaturesAttr: any = []
   const forecastLineFeatures: any = []
   const forecastPointFeatures: any = [[]]
-  //windRoleList台风路径列表，存储着多个台风路径
-  windRoleList.value.forEach((v: any) => {
+  //windRouteList台风路径列表，存储着多个台风路径
+  windRouteList.value.forEach((v: any) => {
     const line = []
     const attr = []
     for (let i = 0; i < v.length; i++) {
@@ -108,7 +138,7 @@ const initWindInfo = () => {
     lineList.push(line)
     lineFeaturesAttr.push(attr) //每个点有一个属性，存储在以线为单位的数组中，线存储在线属性数组中
   })
-  windForecastRoleList.value.forEach((v: any) => {
+  windForecastRouteList.value.forEach((v: any) => {
     const line = []
     const attr = []
     for (let i = 0; i < v.length; i++) {
@@ -126,7 +156,7 @@ const initWindInfo = () => {
         windid: lineFeaturesAttr[i][0].windid,
       },
     })
-    lineFeatures[i].setStyle(typhoonRole)
+    lineFeatures[i].setStyle(typhoonRoute)
     if (i != 0) {
       pointFeatures.push([])
     }
@@ -137,6 +167,18 @@ const initWindInfo = () => {
         attribute: {
           windid: lineFeaturesAttr[i][j].windid,
           qiya: lineFeaturesAttr[i][j].qiya,
+          tm: lineFeaturesAttr[i][j].tm,
+          coordinate: [
+            lineFeaturesAttr[i][j].jindu,
+            lineFeaturesAttr[i][j].weidu,
+          ],
+          type: 'typhoonPoint',
+          windstrong: lineFeaturesAttr[i][j].windstrong,
+          windspeed: lineFeaturesAttr[i][j].windspeed,
+          movespeed: lineFeaturesAttr[i][j].movespeed,
+          movedirect: lineFeaturesAttr[i][j].movedirect,
+          sevradius: lineFeaturesAttr[i][j].sevradius,
+          tenradius: lineFeaturesAttr[i][j].tenradius,
         },
       })
       const qiya = lineFeaturesAttr[i][j].qiya
@@ -165,7 +207,7 @@ const initWindInfo = () => {
         windid: foreLineFeaturesAttr[i][0].windid,
       },
     })
-    forecastLineFeatures[i].setStyle(typhoonForecastRole)
+    forecastLineFeatures[i].setStyle(typhoonForecastRoute)
     if (i != 0) {
       forecastPointFeatures.push([])
     }
@@ -176,6 +218,21 @@ const initWindInfo = () => {
         attribute: {
           windid: foreLineFeaturesAttr[i][j].windid,
           qiya: foreLineFeaturesAttr[i][j].qiya,
+          tm: foreLineFeaturesAttr[i][j].tm,
+          coordinate: [
+            foreLineFeaturesAttr[i][j].jindu,
+            foreLineFeaturesAttr[i][j].weidu,
+          ],
+          type: foreLineFeaturesAttr[i][j].forecast
+            ? 'typhoonForecastPoint'
+            : 'typhoonPoint',
+          windstrong: foreLineFeaturesAttr[i][j].windstrong,
+          windspeed: foreLineFeaturesAttr[i][j].windspeed,
+          movespeed: foreLineFeaturesAttr[i][j].movespeed,
+          movedirect: foreLineFeaturesAttr[i][j].movedirect,
+          sevradius: foreLineFeaturesAttr[i][j].sevradius,
+          tenradius: foreLineFeaturesAttr[i][j].tenradius,
+          forecast: foreLineFeaturesAttr[i][j].forecast,
         },
       })
       const qiya = foreLineFeaturesAttr[i][j].qiya
@@ -208,6 +265,7 @@ const initWindInfo = () => {
     properties: {
       title: '台风',
     },
+    zIndex: 100,
     source: source,
   })
   // console.log('layer', layer.getSource()?.getFeatures())
@@ -217,7 +275,7 @@ const initWindInfo = () => {
 const getWindInfo = async (windId: number) => {
   await getWindInfoAPI(windId).then((res) => {
     if (res.code == 200) {
-      roleData.value = res.data.reverse()
+      routeData.value = res.data.reverse()
       total.value = res.data.length
     }
   })
@@ -226,28 +284,28 @@ const getWindInfo = async (windId: number) => {
       forecastData.value = res.data.reverse()
     }
   })
-  // let newArr = roleData.value.concat(forecastData.value)
-  const newArr = roleData.value
-  forecastData.value.push(roleData.value[0])
+  // let newArr = routeData.value.concat(forecastData.value)
+  const newArr = routeData.value
+  forecastData.value.push(routeData.value[0])
   let flag = false
   let flag2 = false
   //添加前检查是否存在路径
-  windForecastRoleList.value.forEach((v: any) => {
+  windForecastRouteList.value.forEach((v: any) => {
     if (v[0].windid == forecastData.value[0].windid) {
       flag2 = true
     }
   })
   if (!flag2) {
-    windForecastRoleList.value.push(forecastData.value)
+    windForecastRouteList.value.push(forecastData.value)
   }
   //添加前检查是否存在路径
-  windRoleList.value.forEach((v: any) => {
+  windRouteList.value.forEach((v: any) => {
     if (v[0].windid == newArr[0].windid) {
       flag = true
     }
   })
   if (!flag) {
-    windRoleList.value.push(newArr)
+    windRouteList.value.push(newArr)
   }
   initWindInfo()
 }
@@ -293,13 +351,19 @@ const handleSelectionChange = async (val: any) => {
     await getWindInfo(windid)
     const features = windStore.wind.getSource().getFeatures()
     for (let i = 0; i < features.length; i++) {
-      //如果没有选择，图层移除相关要素
+      //如果没有选择，图层移除相关要素和图层
       if (
         !val
           .map((v: any) => v.windid)
           .includes(features[i].get('attribute').windid)
       ) {
         windStore.wind.getSource().removeFeature(features[i])
+        const arr = props.map.getAllLayers()
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i].getProperties().title == 'typhoonCircle') {
+            props.map.removeLayer(arr[i])
+          }
+        }
       }
     }
     //删除旧图层后重新添加新图层
@@ -320,6 +384,12 @@ const handleSelectionChange = async (val: any) => {
     getLegend()
     visible.value = false
     props.map.removeLayer(windStore.wind)
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].getProperties().title == 'typhoonCircle') {
+        props.map.removeLayer(arr[i])
+      }
+    }
     return
   }
 }

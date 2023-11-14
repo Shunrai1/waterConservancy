@@ -47,7 +47,11 @@
               @auto="autoPopup"
               :map="map"
             ></Rain>
-            <Wind v-show="editableTabsValue == '3'" :map="map"></Wind>
+            <Wind
+              v-show="editableTabsValue == '3'"
+              :map="map"
+              @auto="autoPopup"
+            ></Wind>
           </template>
         </el-tab-pane>
       </el-tabs>
@@ -62,8 +66,16 @@
       class="ol-popup-closer"
     ></a>
     <!-- 标题 -->
-    <div id="popup-content" ref="popupContentRef"></div>
+    <div
+      v-show="waterVisible || rainVisible"
+      id="popup-content"
+      ref="popupContentRef"
+    ></div>
+    <div v-show="typhoonVisible" class="typhoonTitle">
+      {{ typhoonType == 'typhoonPoint' ? '实测路径' : '预测路径' }}
+    </div>
     <!-- 内容 -->
+    <!-- 实时水情 -->
     <div v-show="waterVisible">
       <div ref="chart" id="chart" style="width: 300px; height: 200px"></div>
       <el-form label-width="70px" class="form">
@@ -83,6 +95,7 @@
         </el-form-item>
       </el-form>
     </div>
+    <!-- 实时雨情 -->
     <div v-show="rainVisible">
       <div ref="rainChart" id="chart" style="width: 300px; height: 200px"></div>
       <el-form label-width="70px" class="form">
@@ -97,6 +110,26 @@
         <el-form-item label="地&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;址">
           {{ address }}
         </el-form-item>
+      </el-form>
+    </div>
+    <!-- 台风路径 -->
+    <div v-show="typhoonVisible">
+      <el-form label-width="70px" class="form">
+        <el-form-item
+          :label="typhoonType == 'typhoonPoint' ? '过去时间' : '预测时间'"
+        >
+          {{ tm }}
+        </el-form-item>
+        <el-form-item label="预测国家" v-show="typhoonType != 'typhoonPoint'">
+          {{ forecast }}
+        </el-form-item>
+        <el-form-item label="坐标位置">
+          {{ lonlat }}
+        </el-form-item>
+        <el-form-item label="最大风力">{{ windstrong }}级</el-form-item>
+        <el-form-item label="最大风速">{{ windspeed }}米/秒</el-form-item>
+        <el-form-item label="移动速度">{{ movespeed }}公里/小时</el-form-item>
+        <el-form-item label="移动方向">{{ movedirect }}</el-form-item>
       </el-form>
     </div>
   </div>
@@ -118,6 +151,7 @@ import { Map } from 'ol'
 import useLegendStore from '@/store/modules/legend'
 import { reservoirStyle, riverStyle } from '@/utils/style'
 import { getAllRainAPI } from '@/api/Rain'
+import useSetWindCircle from '@/hooks/typhoonCircle'
 
 const legendStore = useLegendStore()
 const $emit = defineEmits(['legend'])
@@ -147,6 +181,7 @@ const popupCloserRef = ref()
 const chart = ref()
 const waterVisible = ref<boolean>(false) //控制实时水情的popup内容区是否展示
 const rainVisible = ref<boolean>(false) ////控制实时雨情的popup内容区是否展示
+const typhoonVisible = ref<boolean>(false) //控制台风路径的popup内容区是否展示
 const dangerLevel = ref<number>(120) //危险水位
 const currentLevel = ref<number>(100) //目前水位
 const time = ref()
@@ -154,6 +189,15 @@ const address = ref()
 const rainTotal = ref()
 const rainChart = ref()
 const reservoirAndRiverVisble = ref<boolean>(false)
+//台风路径
+const tm = ref()
+const lonlat = ref()
+const windstrong = ref()
+const windspeed = ref()
+const movespeed = ref()
+const movedirect = ref()
+const typhoonType = ref()
+const forecast = ref()
 // let rainVisible = ref<boolean>(false)
 
 //台风路径多选框改变
@@ -211,6 +255,16 @@ const autoPopup = (pixel: Pixel, attribute: any) => {
     time,
     address,
     popupVisible,
+    typhoonData: {
+      typhoonVisible,
+      tm,
+      lonlat,
+      windstrong,
+      windspeed,
+      movespeed,
+      movedirect,
+      forecast,
+    },
   }
   if (attribute.type == 'reservoir') {
     usePopup(1, props.map, pixel, attribute, refs, 'reservoir')
@@ -218,6 +272,31 @@ const autoPopup = (pixel: Pixel, attribute: any) => {
     usePopup(1, props.map, pixel, attribute, refs, 'river')
   } else if (attribute.type == 'rain') {
     usePopup(1, props.map, pixel, attribute, refs, 'rain')
+  } else if (attribute.type == 'typhoonPoint') {
+    typhoonType.value = 'typhoonPoint'
+    usePopup(1, props.map, pixel, attribute, refs, 'typhoonPoint')
+    const node = {
+      WD: attribute.coordinate[1],
+      JD: attribute.coordinate[0],
+      EN7Radii: attribute.tenradius,
+      ES7Radii: attribute.tenradius + 20,
+      WN7Radii: attribute.tenradius - 30,
+      WS7Radii: attribute.tenradius - 20,
+      EN10Radii: attribute.sevradius,
+      ES10Radii: attribute.sevradius + 20,
+      WN10Radii: attribute.sevradius - 30,
+      WS10Radii: attribute.sevradius - 20,
+    }
+    const arr = props.map.getAllLayers()
+    for (let i = 0; i < arr.length; i++) {
+      if (arr[i].getProperties().title == 'typhoonCircle') {
+        props.map.removeLayer(arr[i])
+      }
+    }
+    const layers = useSetWindCircle(node)
+    layers?.forEach((v) => {
+      props.map.addLayer(v)
+    })
   }
 }
 //地图弹出框
@@ -251,6 +330,16 @@ const reservoirPopup = () => {
         time,
         address,
         popupVisible,
+        typhoonData: {
+          typhoonVisible,
+          tm,
+          lonlat,
+          windstrong,
+          windspeed,
+          movespeed,
+          movedirect,
+          forecast,
+        },
       }
       const pixel = props.map.getEventPixel(evt.originalEvent)
       let attribute
@@ -259,11 +348,11 @@ const reservoirPopup = () => {
         console.log(feature.getProperties())
         attribute = feature.getProperties().attribute
       } else {
+        //聚合要素
         attribute = feature.getProperties().features[0].values_.attribute
       }
-
+      if (!attribute) return
       if (attribute.type == 'reservoir') {
-        console.log('popup')
         const pLen = feature.getProperties().features.length
         reservoirAndRiverVisble.value = true
         rainVisible.value = false
@@ -278,6 +367,44 @@ const reservoirPopup = () => {
         rainVisible.value = true
         const pLen = 1
         usePopup(pLen, props.map, pixel, attribute, refs, 'rain')
+      } else if (attribute.type == 'typhoonPoint') {
+        const pLen = 1
+        typhoonType.value = 'typhoonPoint'
+        usePopup(pLen, props.map, pixel, attribute, refs, 'typhoonPoint')
+        // {JSON} 格式{"WD":"20.9","JD":"116.2","EN7Radii":"220","ES7Radii":"220","WS7Radii":"260","WN7Radii":"240","EN10Radii":"50","ES10Radii":"80","WS10Radii":"80","WN10Radii":"50"}
+        const node = {
+          WD: attribute.coordinate[1],
+          JD: attribute.coordinate[0],
+          EN7Radii: attribute.tenradius,
+          ES7Radii: attribute.tenradius + 20,
+          WN7Radii: attribute.tenradius - 30,
+          WS7Radii: attribute.tenradius - 20,
+          EN10Radii: attribute.sevradius,
+          ES10Radii: attribute.sevradius + 20,
+          WN10Radii: attribute.sevradius - 30,
+          WS10Radii: attribute.sevradius - 20,
+        }
+        const arr = props.map.getAllLayers()
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i].getProperties().title == 'typhoonCircle') {
+            props.map.removeLayer(arr[i])
+          }
+        }
+        const layers = useSetWindCircle(node)
+        layers?.forEach((v) => {
+          props.map.addLayer(v)
+        })
+      } else if (attribute.type == 'typhoonForecastPoint') {
+        const pLen = 1
+        typhoonType.value = 'typhoonForecastPoint'
+        usePopup(
+          pLen,
+          props.map,
+          pixel,
+          attribute,
+          refs,
+          'typhoonForecastPoint',
+        )
       }
     } else {
       // 当前点击位置没有要素
@@ -365,10 +492,19 @@ const checkChange = (valList: CheckboxValueType[]) => {
     $emit('legend')
   }
   if (!valList.includes('台风路径')) {
-    console.log('taifenlujjin1')
+    legendStore.removeLegend('热带低压')
+    legendStore.removeLegend('热带风暴')
+    legendStore.removeLegend('强热带风暴')
+    legendStore.removeLegend('台风')
+    legendStore.removeLegend('强台风')
+    legendStore.removeLegend('超强台风')
+    $emit('legend')
     const arr = props.map.getAllLayers()
     for (let i = 0; i < arr.length; i++) {
-      if (arr[i].getProperties().title == '台风') {
+      if (
+        arr[i].getProperties().title == '台风' ||
+        arr[i].getProperties().title == 'typhoonCircle'
+      ) {
         props.map.removeLayer(arr[i])
       }
     }
@@ -542,6 +678,18 @@ onBeforeUnmount(() => {
     div {
       margin: 0;
     }
+  }
+  //台风标题
+  .typhoonTitle {
+    background-color: rgb(142, 142, 232);
+    height: 25px;
+    width: 90px;
+    color: white;
+    border-radius: 5%;
+    text-align: center;
+    font-size: 16px;
+    line-height: 25px;
+    margin-bottom: 10px;
   }
 }
 

@@ -3,6 +3,7 @@ import { Map, Overlay } from 'ol'
 import { Pixel } from 'ol/pixel'
 import { Ref } from 'vue'
 import * as echarts from 'echarts'
+import { fromLonLat } from 'ol/proj'
 /**
  * 实现popup功能
  * @param pLen
@@ -29,6 +30,7 @@ export const usePopup = (
     time: Ref
     address: Ref
     popupVisible: Ref<boolean>
+    typhoonData?: any
   },
   type: string,
 ) => {
@@ -44,7 +46,18 @@ export const usePopup = (
     popupContentRef,
     popupRef,
     popupCloserRef,
+    typhoonData,
   } = refs
+  const {
+    typhoonVisible,
+    tm,
+    lonlat,
+    windstrong,
+    windspeed,
+    movespeed,
+    movedirect,
+    forecast,
+  } = typhoonData
   popupVisible.value = true
   //清除已有echart实例
   // myChart.value?.dispose()
@@ -75,6 +88,7 @@ export const usePopup = (
       popupContentRef.value.innerHTML = ''
       waterVisible.value = true
       rainVisible.value = false
+      typhoonVisible.value = false
       // getEventPixel(evt.originalEvent) 是在地图点击事件中获取点击位置的像素坐标。
 
       map.forEachFeatureAtPixel(pixel, function () {
@@ -228,6 +242,7 @@ export const usePopup = (
   if (type == 'rain') {
     popupContentRef.value.innerHTML = ''
     waterVisible.value = false
+    typhoonVisible.value = false
     rainVisible.value = true
     map.forEachFeatureAtPixel(pixel, function () {
       popupContentRef.value.innerHTML = ''
@@ -308,6 +323,37 @@ export const usePopup = (
       overlay.setPosition(attribute.coordinate)
       map.addOverlay(overlay)
     })
+  }
+  //台风路径
+  if (type == 'typhoonPoint') {
+    waterVisible.value = false
+    rainVisible.value = false
+    typhoonVisible.value = true
+    map.forEachFeatureAtPixel(pixel, function () {
+      tm.value = attribute.tm
+      lonlat.value = attribute.coordinate
+      windstrong.value = attribute.windstrong
+      windspeed.value = attribute.windspeed
+      movespeed.value = attribute.movespeed
+      movedirect.value = attribute.movedirect
+      overlay.setPosition(fromLonLat(attribute.coordinate))
+      map.addOverlay(overlay)
+    })
+  }
+  //台风预测路径
+  if (type == 'typhoonForecastPoint') {
+    waterVisible.value = false
+    rainVisible.value = false
+    typhoonVisible.value = true
+    forecast.value = attribute.forecast
+    tm.value = attribute.tm
+    lonlat.value = attribute.coordinate
+    windstrong.value = attribute.windstrong
+    windspeed.value = attribute.windspeed
+    movespeed.value = attribute.movespeed
+    movedirect.value = attribute.movedirect
+    overlay.setPosition(fromLonLat(attribute.coordinate))
+    map.addOverlay(overlay)
   }
 }
 /**

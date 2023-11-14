@@ -412,10 +412,10 @@ onUnmounted(() => {
   }
   .legend {
     position: absolute;
-    top: 72%;
+    top: 75%;
     left: 5%;
     z-index: 4;
-    height: 300px;
+    height: 260px;
     width: 250px;
     background-color: rgb(66, 62, 62);
     color: white;

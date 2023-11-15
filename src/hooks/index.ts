@@ -27,6 +27,7 @@ export const usePopup = (
     rainVisible: Ref<boolean>
     dangerLevel: Ref<number> //危险水位
     currentLevel: Ref<number> //目前水位
+    titleVisible: Ref
     time: Ref
     address: Ref
     popupVisible: Ref<boolean>
@@ -38,6 +39,7 @@ export const usePopup = (
     popupVisible,
     waterVisible,
     rainVisible,
+    titleVisible,
     address,
     time,
     currentLevel,
@@ -84,6 +86,7 @@ export const usePopup = (
   }
   //实时水情
   if (type == 'reservoir' || type == 'river') {
+    titleVisible.value = true
     if (pLen === 1) {
       popupContentRef.value.innerHTML = ''
       waterVisible.value = true
@@ -223,6 +226,7 @@ export const usePopup = (
         map.addOverlay(overlay)
       })
     } else {
+      console.log('plen')
       popupContentRef.value.innerHTML = ''
       waterVisible.value = false
       //新增div元素
@@ -240,6 +244,7 @@ export const usePopup = (
   }
   //实时雨情
   if (type == 'rain') {
+    titleVisible.value = true
     popupContentRef.value.innerHTML = ''
     waterVisible.value = false
     typhoonVisible.value = false
@@ -326,6 +331,7 @@ export const usePopup = (
   }
   //台风路径
   if (type == 'typhoonPoint') {
+    titleVisible.value = false
     waterVisible.value = false
     rainVisible.value = false
     typhoonVisible.value = true
@@ -342,6 +348,7 @@ export const usePopup = (
   }
   //台风预测路径
   if (type == 'typhoonForecastPoint') {
+    titleVisible.value = false
     waterVisible.value = false
     rainVisible.value = false
     typhoonVisible.value = true

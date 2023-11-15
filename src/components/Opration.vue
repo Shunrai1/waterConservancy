@@ -66,11 +66,7 @@
       class="ol-popup-closer"
     ></a>
     <!-- 标题 -->
-    <div
-      v-show="waterVisible || rainVisible"
-      id="popup-content"
-      ref="popupContentRef"
-    ></div>
+    <div v-show="titleVisible" id="popup-content" ref="popupContentRef"></div>
     <div v-show="typhoonVisible" class="typhoonTitle">
       {{ typhoonType == 'typhoonPoint' ? '实测路径' : '预测路径' }}
     </div>
@@ -179,6 +175,7 @@ const popupRef = ref()
 const popupContentRef = ref()
 const popupCloserRef = ref()
 const chart = ref()
+const titleVisible = ref(true)
 const waterVisible = ref<boolean>(false) //控制实时水情的popup内容区是否展示
 const rainVisible = ref<boolean>(false) ////控制实时雨情的popup内容区是否展示
 const typhoonVisible = ref<boolean>(false) //控制台风路径的popup内容区是否展示
@@ -255,6 +252,7 @@ const autoPopup = (pixel: Pixel, attribute: any) => {
     time,
     address,
     popupVisible,
+    titleVisible,
     typhoonData: {
       typhoonVisible,
       tm,
@@ -330,6 +328,7 @@ const reservoirPopup = () => {
         time,
         address,
         popupVisible,
+        titleVisible,
         typhoonData: {
           typhoonVisible,
           tm,

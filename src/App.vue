@@ -6,6 +6,7 @@
     </div>
     <!-- 右侧操作选择面板 -->
     <Opration :map="map!" @legend="getLegend" />
+    <!-- 切换底图 -->
     <div class="basemap">
       <div class="vector" title="显示矢量标注地图" @click="invisibelVector">
         <img

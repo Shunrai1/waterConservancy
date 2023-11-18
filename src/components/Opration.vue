@@ -8,7 +8,7 @@
       <el-checkbox label="实时水情" @change="waterCheck" />
       <el-checkbox label="实时雨情" @change="rainCheck" />
       <el-checkbox label="台风路径" @change="windCheck" />
-      <el-checkbox label="卫星云层" />
+      <el-checkbox label="卫星云层" @change="satelliteCheck" />
       <el-button
         @click="handle"
         :class="['btn', flag ? 'active' : '']"
@@ -129,12 +129,60 @@
       </el-form>
     </div>
   </div>
+  <!-- 卫星云层dialog -->
+  <el-dialog
+    :close-on-click-modal="false"
+    v-model="visible"
+    :show-close="false"
+    class="dialog"
+  >
+    <template #header="{ titleId, titleClass }">
+      <div class="my-header">
+        <h4 :id="titleId" :class="titleClass">卫星图层</h4>
+        <el-button type="danger" @click="closeDialog">
+          <el-icon class="el-icon--left"><CircleCloseFilled /></el-icon>
+          关闭
+        </el-button>
+      </div>
+    </template>
+    <div class="main">
+      <div class="mainLeft">
+        <div class="leftTop">
+          <div class="timeDiv">
+            &nbsp;&nbsp; 动画延时:&nbsp;&nbsp;&nbsp;&nbsp;
+            <el-input-number
+              v-model="num"
+              :min="1"
+              :max="10"
+              style="width: 80px; height: 26px"
+              controls-position="right"
+            />
+          </div>
+          <div class="functionButton">
+            <input type="button" value="播放" @click="startShowCloud()" />
+            <input type="button" value="停止" @click="stopShowCloud()" />
+          </div>
+        </div>
+
+        <div ref="selectImgRef" class="selectImg" id="selectImgList"></div>
+      </div>
+      <div class="mainRight">
+        <div class="yuntuMain" id="yuntuImg">
+          <img
+            ref="imgRef"
+            style="height: 530px; width: 720px"
+            src="@/assets/images/yuntu/201206180000.jpg"
+          />
+        </div>
+      </div>
+    </div>
+  </el-dialog>
 </template>
 
 <script setup lang="ts">
 import Wind from './Wind.vue'
 import useWaterStore from '@/store/modules/water'
-import { List } from '@element-plus/icons-vue'
+import { List, CircleCloseFilled } from '@element-plus/icons-vue'
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { CheckboxValueType, TabPaneName } from 'element-plus'
 import Water from './Water.vue'
@@ -149,6 +197,8 @@ import { reservoirStyle, riverStyle } from '@/utils/style'
 import { getAllRainAPI } from '@/api/Rain'
 import useSetWindCircle from '@/hooks/typhoonCircle'
 
+const num = ref(1)
+const visible = ref(false)
 const legendStore = useLegendStore()
 const $emit = defineEmits(['legend'])
 const props = defineProps({
@@ -196,7 +246,164 @@ const movedirect = ref()
 const typhoonType = ref()
 const forecast = ref()
 // let rainVisible = ref<boolean>(false)
+const timeStrArray: any = [] //记录云图地址数组
+const timeShowStrArr: any = [] //记录云图地址数组
+let ytInfoTimer: any = null //云图播放动画时间控制器
+let timeControl: any = 0 //控制卫星云图播放
+const selectImgRef = ref()
+const imgRef = ref()
+/*
+ *	初始化图片列表
+ *@author fmm 2015-06-24
+ */
+function initSelectImgList() {
+  GetImgAddress() //得到图片地址
+  //动态创建左侧列表
+  let html = '<ul>'
+  for (let i = 0; i < timeStrArray.length; i++) {
+    const tempHtml =
+      "<li class='wxytLi c' style='padding:5px;font-size:16px;cursor:pointer;' >" +
+      timeStrArray[i] +
+      '</li>'
+    html += tempHtml
+  }
+  html += '</ul>'
+  selectImgRef.value.innerHTML = html
+  // 通过事件委托绑定点击事件
+  selectImgRef.value.addEventListener('click', handleClick)
+  // 绑定鼠标移入事件
+  selectImgRef.value.addEventListener('mouseover', handleMouseOver)
 
+  // 绑定鼠标移出事件
+  selectImgRef.value.addEventListener('mouseout', handleMouseOut)
+  let selectedLi: any = null // 用于跟踪当前选中的 <li> 元素
+  function handleClick(event: any) {
+    const target = event.target
+    const imgUrl = '/src/assets/images/yuntu/' + target.textContent + '.jpg'
+    imgRef.value.src = imgUrl
+    timeControl = timeShowStrArr.indexOf(imgUrl)
+    if (target && target.tagName === 'LI') {
+      if (selectedLi) {
+        selectedLi.style.backgroundColor = 'white' // 将上一个选中的 <li> 的背景色设置为白色
+      }
+
+      target.style.backgroundColor = 'skyblue' // 将当前点击的 <li> 的背景色设置为天蓝色
+      selectedLi = target // 更新选中的 <li> 元素
+    }
+  }
+
+  function handleMouseOver(event: any) {
+    const target = event.target
+    if (target && target.tagName === 'LI' && target !== selectedLi) {
+      target.style.backgroundColor = 'skyblue' // 将当前鼠标移入的 <li> 的背景色设置为天蓝色
+    }
+  }
+
+  function handleMouseOut(event: any) {
+    const target = event.target
+    if (target && target.tagName === 'LI' && target !== selectedLi) {
+      target.style.backgroundColor = 'white' // 将当前鼠标移出的 <li> 的背景色设置为白色
+    }
+  }
+}
+
+/*
+ *	得到图片的地址
+ *@author fmm 2015-06-24
+ */
+function GetImgAddress() {
+  const dataTimeTemp = '20120618'
+  let timeStr = ''
+  for (let i = 0; i < 24; i++) {
+    //一天24个小时
+    for (let j = 0; j < 60; j = j + 15) {
+      //每15分钟显示一张图片
+      if (i < 10) {
+        if (j == 0) {
+          timeStr = dataTimeTemp + '0' + i + '0' + j
+        } else {
+          timeStr = dataTimeTemp + '0' + i + j
+        }
+      } else {
+        if (j == 0) {
+          timeStr = dataTimeTemp + i + '0' + j
+        } else {
+          timeStr = dataTimeTemp + i + j
+        }
+      }
+      timeStrArray.push(timeStr)
+      const strAddress = '/src/assets/images/yuntu/' + timeStr + '.jpg'
+      timeShowStrArr.push(strAddress)
+    }
+  }
+}
+/*
+ *	开始播放云图动画
+ *@author fmm 2015-06-24
+ */
+function startShowCloud() {
+  if (ytInfoTimer != null) {
+    clearTimer()
+  }
+  //设置计时器动态播放
+  ytInfoTimer = setInterval(function () {
+    console.log(timeControl)
+    const liElements: any = document.querySelectorAll('.selectImg ul li')
+    if (timeControl * 25 > 230) {
+      selectImgRef.value.scrollTop = timeControl * 25 - 150
+    }
+    if (timeControl != 0) {
+      liElements[timeControl - 1].style.backgroundColor = 'white'
+    }
+    liElements[timeControl].style.backgroundColor = 'skyblue'
+    if (timeControl < timeShowStrArr.length) {
+      const imgUrl = timeShowStrArr[timeControl++]
+      imgRef.value.src = imgUrl //切换云图图片
+    } else {
+      timeControl = 0
+      clearTimer()
+    }
+  }, num.value * 1000)
+}
+
+/*
+ *	清除卫星云图时间控制器
+ *@author fmm 2015-06-25
+ */
+function clearTimer() {
+  if (ytInfoTimer != null) {
+    clearInterval(ytInfoTimer)
+    ytInfoTimer = null
+  }
+}
+
+/*
+ *	停止卫星云图播放
+ *@author fmm 2015-06-25
+ */
+function stopShowCloud() {
+  const liElements: any = document.querySelectorAll('.selectImg ul li')
+  clearTimer()
+  if (timeControl > 0) {
+    liElements[timeControl - 1].style.backgroundColor = 'skyblue'
+  }
+}
+//卫星云图多选框改变
+const satelliteCheck = (val: any) => {
+  visible.value = val
+  timeControl = 0
+  if (visible.value) {
+    nextTick(() => {
+      initSelectImgList()
+    })
+  }
+}
+const closeDialog = () => {
+  visible.value = false
+  clearInterval(ytInfoTimer)
+  const index = checkList.value.indexOf('卫星图层')
+  checkList.value.splice(index, 1)
+}
 //台风路径多选框改变
 const windCheck = (val: any) => {
   editableTabsValue.value = '3'
@@ -545,12 +752,6 @@ const handle = () => {
           name: '3',
           content: 'Tab 2 content',
         })
-      } else {
-        editList.value.push({
-          title: '卫星云层',
-          name: '4',
-          content: 'Tab 2 content',
-        })
       }
     })
   }
@@ -596,12 +797,6 @@ watch(
           name: '3',
           content: 'Tab 2 content',
         })
-      } else {
-        editList.value.push({
-          title: '卫星云层',
-          name: '4',
-          content: 'Tab 2 content',
-        })
       }
     })
   },
@@ -631,7 +826,55 @@ onBeforeUnmount(() => {
 })
 </script>
 
-<style scoped lang="scss">
+<style lang="scss">
+.dialog {
+  .el-dialog__body {
+    padding-top: 5px;
+  }
+  .main {
+    display: flex;
+    justify-content: center;
+    .mainLeft {
+      width: 180px;
+      height: 530px;
+      border: 1px solid black;
+      .leftTop {
+        background-color: #cccccc;
+      }
+      .timeDiv {
+        background-color: #cccccc;
+        padding-top: 5px;
+        padding-bottom: 10px;
+      }
+      .functionButton {
+        background-color: #cccccc;
+        display: flex;
+        justify-content: space-around;
+        padding-bottom: 10px;
+        border-bottom: 1px solid black;
+      }
+      .selectImg {
+        overflow: auto; /* 设置溢出内容时显示滚动条 */
+        height: 450px; /* 设置容器的固定高度，超出部分将出现滚动条 */
+        .wxytLi:hover {
+          background-color: skyblue;
+        }
+        li.selected {
+          background-color: skyblue;
+        }
+      }
+    }
+    .mainRight {
+      width: 720px;
+      height: 530px;
+    }
+  }
+}
+.my-header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
 .opration {
   position: absolute;
   top: 2%;
